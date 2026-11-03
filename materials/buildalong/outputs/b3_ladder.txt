@@ -1,0 +1,5 @@
+scale: 211,670,894 table rows / 18,362 sample rows
+star   rows  211,670,894  processed   77.0251 GiB  billed     78,874 MB  $0.4701
+named  rows  211,670,894  processed    4.5816 GiB  billed      4,692 MB  $0.0280
+part   rows    1,213,529  processed    0.0263 GiB  billed         27 MB  $0.0002
+clus   rows      172,753  processed    0.0037 GiB  billed         10 MB  $0.0001  (36 of 257 modelled blocks)

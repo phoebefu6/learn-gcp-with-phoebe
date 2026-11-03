@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Builder session 5 of 8. The idea behind Dataflow: an Apache Beam pipeline is a graph of PTransforms passing PCollections, windows group events by event time, and the same graph runs on your laptop or on Dataflow. Built with apache-beam 2.77.0 on 18,362 real Chicago taxi trips.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="Dataflow and Beam, the idea - learn gcp with phoebe">
+<meta property="og:description" content="Builder session 5 of 8. One Beam pipeline on a laptop: mean fare per year from 2013 to 2023, and 2019 trips counted in 30-day fixed windows.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/courses/b5-dataflow-and-beam-the-idea.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Dataflow and Beam, the idea - learn gcp with phoebe">
+<meta name="twitter:description" content="Builder session 5 of 8. Pipelines, PCollections, windows, and when Dataflow beats BigQuery SQL, on a laptop.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Builder session 5 · Dataflow and Beam, the idea - learn gcp with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=2">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-gcp-with-phoebe</a> / Builder session 5 of 8</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn GCP with Phoebe · Builder track · Session 5 of 8</div>
+    <h1>Dataflow and Beam, <span class="accent">the idea</span></h1>
+    <p class="sub">Dataflow is the Google Cloud service that runs Apache Beam pipelines. Before you spend a cent on workers, the idea fits on a laptop: a pipeline is a graph of steps, each step hands a collection to the next, and windows decide which events belong together in time. Tonight you write one Beam pipeline over the same 18,362 Chicago taxi trips as session 1, run it locally, and learn when the honest answer is "just write the SQL".</p>
+    <div class="chip-row">
+      <span class="chip level">🟠 Applied</span>
+      <span class="chip audience">Data engineers, analytics engineers, analysts who code</span>
+      <span class="chip audience">Python on a laptop, no account</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:4">3-18 · Graphs, windows, when Dataflow</span>
+      <span class="a3" style="flex:5">18-40 · Build-along: a Beam pipeline on your laptop</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where we start</h2>
+    </div>
+    <p class="lede">Google's own one-line definition is the place to start: "Dataflow is a Google Cloud service that provides unified stream and batch data processing at scale", and "Dataflow executes Apache Beam pipelines" (Dataflow overview). So the skill you need first is Beam, not Dataflow. Beam ships a Direct Runner that "executes pipelines on your machine", which is how the build-along runs with no account and no bill. The same graph, given a different runner, goes to Dataflow; that step is shown on this page, not run, because it needs a billing-enabled project.</p>
+
+    <div class="legend">
+      <span class="pill">🎫 Clear all three quiz questions to stamp your passport</span>
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">★ Build-along = you make the artifact</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> A 26-line Beam pipeline that reads three of the sample's 23 columns, prints the mean fare for each year from 2013 to 2023, and counts 2019 trips in 30-day event-time windows, plus a clear rule for when a job like it belongs in Dataflow and when it belongs in a BigQuery query.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers Pipeline, PCollection, PTransform</span>
+      <h2>A pipeline is a graph you can read</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">Beam asks you to describe the work, not to run it step by step. You build a graph: boxes are transforms, arrows are the collections that flow between them, and only when the graph is complete does a runner execute it, on your laptop or on Dataflow's workers. Three nouns from the Beam programming guide carry the whole model, and the build-along uses all three.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The build-along pipeline drawn as a graph. ReadFromParquet reads 3 of 23 columns and outputs a PCollection of rows. Filter keeps rows where fare is not None. Map turns each row into a year and fare pair. Mean.PerKey, a Combine per year, outputs eleven means, one per year. A second branch reads the same filtered PCollection, keeps 2019, applies 30-day windows and counts per window.">
+        <defs>
+          <filter id="b5aSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="51" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b5aHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="b5aAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b5aH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b5aL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b5aS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b5aA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b5aN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="b5aH" x="30" y="26">BOXES ARE PTRANSFORMS, ARROWS CARRY PCOLLECTIONS</text>
+
+        <g filter="url(#b5aSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="56" width="170" height="60" rx="8" transform="rotate(-1 115 86)" fill="#FFFFFF"/>
+          <rect x="240" y="56" width="150" height="60" rx="8" transform="rotate(0.8 315 86)" fill="#FFFFFF"/>
+          <rect x="430" y="56" width="180" height="60" rx="8" transform="rotate(-0.6 520 86)" fill="#E8F0FE"/>
+          <rect x="650" y="56" width="200" height="60" rx="8" transform="rotate(0.7 750 86)" fill="#FBBC04"/>
+          <rect x="430" y="180" width="180" height="52" rx="8" transform="rotate(0.6 520 206)" fill="#FFFFFF"/>
+          <rect x="650" y="180" width="200" height="52" rx="8" transform="rotate(-0.5 750 206)" fill="url(#b5aHc)"/>
+          <path d="M204 86 L232 86" marker-end="url(#b5aAr)"/>
+          <path d="M394 86 L422 86" marker-end="url(#b5aAr)"/>
+          <path d="M614 86 L642 86" marker-end="url(#b5aAr)"/>
+          <path d="M370 120 L370 206 L422 206" marker-end="url(#b5aAr)"/>
+          <path d="M614 206 L642 206" marker-end="url(#b5aAr)"/>
+        </g>
+
+        <text class="b5aL" x="44" y="82">ReadFromParquet</text>
+        <text class="b5aS" x="44" y="100">3 of 23 columns</text>
+        <text class="b5aL" x="254" y="82">Filter</text>
+        <text class="b5aS" x="254" y="100">fare is not None</text>
+        <text class="b5aL" x="444" y="82">Map</text>
+        <text class="b5aS" x="444" y="100">row -&gt; (year, fare)</text>
+        <text class="b5aL" x="664" y="82">Mean.PerKey</text>
+        <text class="b5aL" x="664" y="102">a Combine, per year</text>
+        <text class="b5aA" x="30" y="138">PCollection of rows</text>
+        <text class="b5aA" x="240" y="138">rows with a fare</text>
+        <text class="b5aA" x="430" y="138">(year, fare) pairs</text>
+        <text class="b5aA" x="650" y="138">11 means, one per year</text>
+        <text class="b5aS" x="40" y="210">a second branch reads the same PCollection</text>
+        <text class="b5aL" x="444" y="202">Filter + WindowInto</text>
+        <text class="b5aS" x="444" y="220">2019, 30-day windows</text>
+        <text class="b5aL" x="664" y="202">Count.Globally</text>
+        <text class="b5aS" x="664" y="220">one count per window</text>
+
+        <text class="b5aN" x="30" y="262">Read it left to right: each box is one named step in b5_beam.py; the lower branch is Part 2.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow box is the Combine that turns 18,362 rows into 11 numbers</figcaption>
+    </figure>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>Three nouns, straight from the Beam guide<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>Pipeline.</strong> "A Pipeline encapsulates your entire data processing task, from start to finish." In the build-along it is the <code>with beam.Pipeline(options=opts) as p:</code> block; when the block closes, the runner executes the graph.</p>
+        <p><strong>PCollection.</strong> "A PCollection represents a distributed data set that your Beam pipeline operates on." You never hold it in a Python list; you hand it to the next transform. <code>trips</code> in the script is a PCollection, and two branches read it.</p>
+        <p><strong>PTransform.</strong> "A PTransform represents a data processing operation, or a step, in your pipeline." Every <code>"Name" &gt;&gt; beam.Something(...)</code> in the script is one, and the name in quotes is what you will see in a job graph later.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>ParDo, GroupByKey and Combine, the three that do the work<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The guide names the core transforms. "ParDo is a Beam transform for generic parallel processing": one element in, zero or more out. <code>beam.Filter</code> and <code>beam.Map</code> in the script are the everyday element-by-element cases of that idea. "GroupByKey is a Beam transform for processing collections of key/value pairs": it gathers every value that shares a key. "Combine is a Beam transform for combining collections of elements or values in your data", and its per-key form combines the values for each key. <code>Mean.PerKey</code> is exactly that: the key is the year, the values are fares, and the result is one mean per year.</p>
+        <p>The professional habit: prefer a Combine to a GroupByKey followed by your own loop. A Combine tells the runner the operation can be done in parts and merged, which is what lets a runner spread it over many workers.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The pipeline Raj could draw on a whiteboard.</strong> At Tidewater Grocers (constructed), Raj from data-eng is asked whether loyalty scans can be cleaned before they land in <code>sales_raw</code>. Instead of a slide, he writes the Beam graph on a laptop with the Direct Runner, names every step, and shows the team the boxes and arrows. The review is about the graph, not about servers; the decision on where it runs comes later, in Part 3.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers windows</span>
+      <h2>Windows decide which events belong together</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">A batch query groups by a column. A stream never ends, so "group by" needs a second question: over which stretch of time? Beam answers with windows, assigned by each element's event time, the moment the thing happened, not the moment the pipeline saw it. The build-along stamps every 2019 trip with its start time and counts trips in 30-day fixed windows.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 410" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four window types over one event-time axis for 2019. Fixed 30-day windows sit side by side without overlapping; twelve sample slots fall into them, and one window holds two slots, giving the real count of 300; the others hold 150 nine times and 149 once. Sliding windows are drawn as staggered brackets that overlap. Session windows wrap clusters of events and close after a gap. The global window is one band across the whole year, where late data is discarded.">
+        <defs>
+          <filter id="b5bSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="57" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b5bHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="b5bAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b5bH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b5bL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b5bS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b5bA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b5bN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="b5bH" x="30" y="26">ONE EVENT-TIME AXIS, FOUR WAYS TO CUT IT</text>
+
+        <g filter="url(#b5bSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="60" y="64" width="62" height="40" rx="4" transform="rotate(-0.5 91 84)" fill="#FFFFFF"/>
+          <rect x="124" y="64" width="62" height="40" rx="4" transform="rotate(0.5 155 84)" fill="#FFFFFF"/>
+          <rect x="188" y="64" width="62" height="40" rx="4" transform="rotate(-0.4 219 84)" fill="#FFFFFF"/>
+          <rect x="252" y="64" width="62" height="40" rx="4" transform="rotate(0.4 283 84)" fill="#FFFFFF"/>
+          <rect x="316" y="64" width="62" height="40" rx="4" transform="rotate(-0.5 347 84)" fill="#FFFFFF"/>
+          <rect x="380" y="64" width="62" height="40" rx="4" transform="rotate(0.5 411 84)" fill="#FFFFFF"/>
+          <rect x="444" y="64" width="62" height="40" rx="4" transform="rotate(-0.4 475 84)" fill="#FFFFFF"/>
+          <rect x="508" y="64" width="62" height="40" rx="4" transform="rotate(0.4 539 84)" fill="#FBBC04"/>
+          <rect x="572" y="64" width="62" height="40" rx="4" transform="rotate(-0.5 603 84)" fill="#FFFFFF"/>
+          <rect x="636" y="64" width="62" height="40" rx="4" transform="rotate(0.5 667 84)" fill="#FFFFFF"/>
+          <rect x="700" y="64" width="62" height="40" rx="4" transform="rotate(-0.4 731 84)" fill="#FFFFFF"/>
+          <rect x="764" y="64" width="62" height="40" rx="4" transform="rotate(0.4 795 84)" fill="#FFFFFF"/>
+          <circle cx="98" cy="76" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="160" cy="76" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="226" cy="76" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="280" cy="76" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="350" cy="76" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="410" cy="76" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="470" cy="76" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="520" cy="76" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="558" cy="76" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="604" cy="76" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="730" cy="76" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="796" cy="76" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <path d="M60 170 L60 164 L188 164 L188 170"/>
+          <path d="M124 186 L124 180 L252 180 L252 186"/>
+          <path d="M188 170 L188 164 L316 164 L316 170" stroke="#174EA6"/>
+          <path d="M252 186 L252 180 L380 180 L380 186" stroke="#174EA6"/>
+          <path d="M316 170 L316 164 L444 164 L444 170"/>
+          <path d="M380 186 L380 180 L508 180 L508 186"/>
+          <path d="M444 170 L444 164 L572 164 L572 170" stroke="#174EA6"/>
+          <path d="M508 186 L508 180 L636 180 L636 186" stroke="#174EA6"/>
+          <path d="M572 170 L572 164 L700 164 L700 170"/>
+          <path d="M636 186 L636 180 L764 180 L764 186"/>
+          <path d="M700 170 L700 164 L828 164 L828 170" stroke="#174EA6"/>
+          <rect x="80" y="226" width="150" height="32" rx="12" transform="rotate(-0.6 155 242)" fill="#E8F0FE"/>
+          <rect x="330" y="226" width="100" height="32" rx="12" transform="rotate(0.6 380 242)" fill="#E8F0FE"/>
+          <rect x="540" y="226" width="220" height="32" rx="12" transform="rotate(-0.4 650 242)" fill="#E8F0FE"/>
+          <circle cx="100" cy="242" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="130" cy="242" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="170" cy="242" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="210" cy="242" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="360" cy="242" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="400" cy="242" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="560" cy="242" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="600" cy="242" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="650" cy="242" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="700" cy="242" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <circle cx="740" cy="242" r="4" fill="#174EA6" stroke="#174EA6"/>
+          <rect x="60" y="294" width="780" height="34" rx="8" transform="rotate(0.2 450 311)" fill="url(#b5bHc)"/>
+          <path d="M60 352 L838 352" marker-end="url(#b5bAr)"/>
+        </g>
+
+        <text class="b5bL" x="30" y="54">Fixed, 30 days: non-overlapping (the build-along, 2019)</text>
+        <text class="b5bL" x="528" y="99">300</text>
+        <text class="b5bS" x="30" y="124">dot = one 15-minute sample slot of about 150 trips; positions schematic, counts real: [300, 150 x 9, 149]</text>
+        <text class="b5bL" x="30" y="152">Sliding: windows can overlap (illustrative, 60-day windows starting every 30 days)</text>
+        <text class="b5bL" x="30" y="214">Session: a quiet gap closes the window (illustrative)</text>
+        <text class="b5bA" x="268" y="246">gap</text>
+        <text class="b5bA" x="474" y="246">gap</text>
+        <text class="b5bL" x="30" y="286">Global: one window for the whole PCollection</text>
+        <text class="b5bL" x="76" y="315">"late data is discarded" (Beam programming guide)</text>
+        <text class="b5bA" x="60" y="372">1 Jan 2019</text>
+        <text class="b5bA" x="400" y="372">event time</text>
+        <text class="b5bA" x="765" y="372">31 Dec 2019</text>
+
+        <text class="b5bN" x="30" y="396">Fixed row: the build-along's real counts. Sliding sizes and session gaps are illustrative.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow window caught two monthly slots, which is why the real output starts with 300</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Four window types, in the guide's own words<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>Fixed.</strong> "A fixed time window represents a consistent duration, non overlapping time interval in the data stream." Every element lands in exactly one window. <strong>Sliding.</strong> "sliding time windows can overlap", so one element can count in several windows: the shape for a moving 7-day total refreshed daily. <strong>Session.</strong> A session window "defines windows that contain elements that are within a certain gap duration of another element": a shopper's visit, closed by a quiet gap. <strong>Global.</strong> "all data in a PCollection is assigned to the single global window, and late data is discarded."</p>
+        <p>In the build-along, <code>TimestampedValue</code> gives each 2019 trip its start time as event time, and <code>WindowInto(FixedWindows(30 * 24 * 3600))</code> cuts the year into 30-day windows. The counts come back as <code>[300, 150, 150, 150, 150, 150, 150, 150, 150, 150, 149]</code>.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Reading the real counts, number by number<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The sample holds one 15-minute slot per month, and each slot carries about 150 trips. A 30-day window is shorter than most months, so the windows drift against the calendar, and once in the year two monthly slots fall inside the same window: that is the 300. Eleven windows hold data, twelve slots fed them.</p>
+        <p>The counts add up to 1,799, while session 1 found 1,800 rows in 2019. The difference is derived from the two outputs: the <code>Has fare</code> filter runs before the 2019 branch, so one 2019 trip with no fare never reached a window. That is the kind of off-by-one a graph makes easy to trace, because every step has a name.</p>
+        <p>Streaming design, late data, triggers and watermarks belong to <a href="https://phoebefu6.github.io/learn-streaming-data-with-phoebe/">learn-streaming-data</a>; these pages stop at what the window types are and how Beam assigns them.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>Same events, three different answers.</strong> Tidewater's loyalty lead, Lin, asks "how many visits did a member make last month?" (constructed). Fixed 30-day windows give one number per window; sliding windows give a fresh rolling number every day; session windows count visits, where a visit ends after a quiet gap. None of them is wrong. The window is a business definition, so agree it with Lin before the pipeline is written.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-3">
+    <div class="section-kicker">
+      <span class="klabel">Part 3 · covers when Dataflow beats BigQuery SQL</span>
+      <h2>When the graph earns its workers</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">The mean fare per year in the build-along is one <code>GROUP BY</code> in BigQuery. Writing it in Beam is the right way to learn Beam and usually the wrong way to answer the question. The test is where the data already sits and what has to happen to it on the way: Dataflow earns its workers when the work is streaming, cut by event time, written in code SQL cannot express, or spread over sources that are not BigQuery tables.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two panels. Stay in BigQuery SQL when the data is already in BigQuery tables, the job is a batch GROUP BY, JOIN or MERGE on a schedule, and the logic fits in SQL; it is billed as the bytes the query reads. Reach for Dataflow, running Apache Beam, for streaming with event-time windows, logic awkward in SQL, many sources and sinks, and one graph for batch and stream. Below, Dataflow's billing units from the default table of the Dataflow pricing page: vCPU 0.056 dollars per hour, memory 0.003557 dollars per GiB-hour, shuffle 0.011 dollars per GiB, billed per second per job.">
+        <defs>
+          <filter id="b5cSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="61" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b5cHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="b5cAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b5cH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b5cL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b5cS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b5cA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b5cN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="b5cH" x="30" y="26">WHERE THE DATA SITS AND WHAT MUST HAPPEN TO IT DECIDES THE ENGINE</text>
+
+        <g filter="url(#b5cSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="44" width="400" height="170" rx="10" transform="rotate(-0.4 230 129)" fill="#FFFFFF"/>
+          <rect x="450" y="44" width="400" height="170" rx="10" transform="rotate(0.4 650 129)" fill="#E8F0FE"/>
+          <rect x="462" y="80" width="376" height="26" rx="5" fill="#FBBC04"/>
+          <rect x="30" y="236" width="820" height="56" rx="10" transform="rotate(0.2 440 264)" fill="#FFFFFF"/>
+        </g>
+
+        <text class="b5cH" x="46" y="68">STAY IN BIGQUERY SQL</text>
+        <text class="b5cL" x="46" y="98">data already sits in BigQuery tables</text>
+        <text class="b5cL" x="46" y="124">batch: a GROUP BY, JOIN or MERGE on a schedule</text>
+        <text class="b5cL" x="46" y="150">the logic fits in SQL</text>
+        <text class="b5cS" x="46" y="176">billed as the bytes the query reads (sessions 2 and 3)</text>
+        <text class="b5cS" x="46" y="196">the mean fare per year is one GROUP BY</text>
+        <text class="b5cH" x="466" y="68">REACH FOR DATAFLOW (APACHE BEAM)</text>
+        <text class="b5cL" x="474" y="98">streaming, cut by event-time windows</text>
+        <text class="b5cL" x="466" y="128">logic awkward in SQL, written in Python or Java</text>
+        <text class="b5cL" x="466" y="152">many sources and sinks, not only BigQuery</text>
+        <text class="b5cL" x="466" y="176">one graph for batch and stream</text>
+        <text class="b5cS" x="466" y="198">billed for workers, per second, per job</text>
+        <text class="b5cL" x="46" y="258">Dataflow bills per second, per job, on these units:</text>
+        <text class="b5cS" x="46" y="280">vCPU $0.056 / hour · memory $0.003557 / GiB-hour · shuffle $0.011 / GiB · plus Streaming Engine and disks</text>
+
+        <text class="b5cN" x="30" y="314">Prices: default table, Dataflow pricing page, 3 November 2026. Re-verify before quoting them.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow line is the case SQL cannot do at all; everything else is a judgement call</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The two-question test<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>Is the data already in BigQuery, and does SQL say what you mean?</strong> Then stay in SQL. A scheduled query or a SQL step is cheaper to own: no workers, no job graph, and the bill is the bytes read, which sessions 2 and 3 taught you to shrink. <strong>Is it arriving as a stream, cut by event time, or crossing several systems?</strong> Then Beam on Dataflow is the tool built for it: Google's overview calls it "unified stream and batch data processing at scale", one graph for both.</p>
+        <p>There is a third option for teams that already write Spark: Managed Service for Apache Spark (formerly Dataproc), on clusters or serverless. Choosing among pipeline designs and orchestration is the job of <a href="https://phoebefu6.github.io/learn-data-pipelines-with-phoebe/">learn-data-pipelines</a> and <a href="https://phoebefu6.github.io/learn-data-orchestration-with-phoebe/">learn-data-orchestration</a>; these pages cover which Google Cloud service runs the result.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>What a Dataflow job puts on the bill<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The Dataflow pricing page lists the units: "Worker vCPU and memory (batch, streaming, and FlexRS)", "Dataflow Shuffle data processed (batch and FlexRS)", "Streaming Engine Compute Units or legacy Streaming Engine data processed (streaming only)" and "Data Compute Units (DCUs) (batch and streaming)". Also billed: "Persistent Disk, GPUs, and snapshots." And the clock: "Dataflow usage is billed in per second increments, on a per job basis."</p>
+        <p>The default table on that page showed, on 3 November 2026: vCPU $0.056 per hour, memory $0.003557 per GiB-hour, shuffle $0.011 per GiB processed. Our read did not name the region behind the default table, so treat these as one region's list prices, and re-verify them on the Dataflow pricing page for your region before you put them in a plan. The habit that matters more than the rate: a streaming job runs all month, so its workers bill all month, while a scheduled query bills only when it runs.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The streaming job that was a nightly GROUP BY.</strong> A team builds a Dataflow pipeline to total yesterday's sales per store, because "pipelines are Dataflow". It runs, it bills workers, and someone has to own the job graph. A year later a new engineer replaces it with one scheduled query over the same table. The story is a constructed composite; the lesson is to ask where the data sits before choosing the engine.</p>
+    </div>
+  </section>
+
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>A Beam pipeline on your laptop</h2>
+      <span class="tag demo">★ 22 min · everyone builds</span>
+    </div>
+    <p class="lede">Five steps, one Python file, the session 1 sample. The pipeline reads three columns, computes the mean fare per year, and counts 2019 trips in 30-day windows. The output at the end is pasted from a real run of exactly this code, with apache-beam 2.77.0; the means are over the 18,362 sampled trips, not the City of Chicago's averages.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Where the pipeline runs. On your laptop, the b5_beam.py pipeline graph goes to the DirectRunner, which in Beam 2.77 hands the job to its local Prism runner; it prints eleven yearly means and eleven window counts. On the right, a dashed panel for Dataflow, reached with runner equals DataflowRunner on Google-managed workers, shown only because it needs a billing-enabled project.">
+        <defs>
+          <filter id="b5dSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="67" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b5dHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="b5dAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b5dH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b5dL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b5dS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b5dW { font: 800 12px Inter, sans-serif; fill: #FFFFFF; }
+          .b5dN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#b5dSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="50" width="560" height="140" rx="12" transform="rotate(-0.3 310 120)" fill="#FFFFFF"/>
+          <rect x="50" y="88" width="150" height="60" rx="8" transform="rotate(-1 125 118)" fill="url(#b5dHc)"/>
+          <rect x="240" y="88" width="140" height="60" rx="8" transform="rotate(0.8 310 118)" fill="#174EA6" stroke="#174EA6"/>
+          <rect x="420" y="88" width="150" height="60" rx="8" transform="rotate(-0.6 495 118)" fill="#FBBC04"/>
+          <rect x="630" y="50" width="220" height="140" rx="12" transform="rotate(0.4 740 120)" fill="#E8F0FE" stroke-dasharray="7 6"/>
+          <path d="M204 118 L232 118" marker-end="url(#b5dAr)"/>
+          <path d="M384 118 L412 118" marker-end="url(#b5dAr)"/>
+          <path d="M594 120 L622 120" marker-end="url(#b5dAr)" stroke-dasharray="5 5"/>
+        </g>
+
+        <text class="b5dH" x="46" y="74">YOUR LAPTOP, TONIGHT</text>
+        <text class="b5dL" x="64" y="114">pipeline graph</text>
+        <text class="b5dL" x="64" y="134">b5_beam.py</text>
+        <text class="b5dW" x="254" y="114">DirectRunner</text>
+        <text class="b5dW" x="254" y="134">picks a runner</text>
+        <text class="b5dL" x="434" y="114">Prism runner</text>
+        <text class="b5dL" x="434" y="134">runs it locally</text>
+        <text class="b5dS" x="50" y="174">prints 11 yearly means and 11 window counts</text>
+        <text class="b5dH" x="646" y="74">DATAFLOW</text>
+        <text class="b5dS" x="646" y="98">--runner=DataflowRunner</text>
+        <text class="b5dS" x="646" y="118">Google-managed workers</text>
+        <text class="b5dS" x="646" y="138">needs a billing-enabled</text>
+        <text class="b5dS" x="646" y="154">project</text>
+        <text class="b5dL" x="646" y="176">shown, not run here</text>
+
+        <text class="b5dN" x="30" y="214">Same graph, different runner. The run log shows the DirectRunner handing the job to Prism.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow box is what actually executed tonight's graph on the build laptop</figcaption>
+    </figure>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>Reuse the environment from builder session 1 and add Beam.</strong> Activate the same <code>.venv</code>, in the folder that holds <code>chicago_taxi_sample.parquet</code> from <a href="b1-cloud-storage-layout-and-parquet.html">session 1</a>. If you skipped it, the curl line fetches the sample again. Beam is a large install; give it a minute.</p>
+        <div class="prompt-box good"><span class="label">★ Step 1 · setup (verified 3 November 2026, the session 1 environment)</span>. .venv/bin/activate
+pip install apache-beam==2.77.0
+curl -O https://phoebefu6.github.io/learn-gcp-with-phoebe/data/chicago_taxi_sample.parquet</div>
+      </div>
+      <div class="step">
+        <p><strong>Choose the runner.</strong> <code>runner="DirectRunner"</code> keeps everything on your machine. The Direct Runner page says it plainly: it is for testing and development, and "not designed for production pipelines".</p>
+        <div class="prompt-box good"><span class="label">★ Step 2 · b5_beam.py, part 1</span># Builder session 5: an Apache Beam pipeline on the DirectRunner (your laptop), no Dataflow needed.
+# Needs: pip install apache-beam==2.77.0
+import sys
+import apache_beam as beam
+from apache_beam.transforms.window import FixedWindows, TimestampedValue
+from apache_beam.options.pipeline_options import PipelineOptions
+
+SRC = sys.argv[1] if len(sys.argv) &gt; 1 else "chicago_taxi_sample.parquet"
+opts = PipelineOptions(runner="DirectRunner")</div>
+      </div>
+      <div class="step">
+        <p><strong>Build the graph: read, filter, then the mean fare per year.</strong> <code>trips</code> is a PCollection read once and used by both branches. <code>Mean.PerKey</code> is the Combine; <code>ToList</code> gathers the eleven results so they print in year order.</p>
+        <div class="prompt-box good"><span class="label">★ Step 3 · b5_beam.py, part 2</span>with beam.Pipeline(options=opts) as p:
+    trips = (p | "Read" &gt;&gt; beam.io.ReadFromParquet(SRC, columns=["trip_start_timestamp", "payment_type", "fare"])
+               | "Has fare" &gt;&gt; beam.Filter(lambda r: r["fare"] is not None))
+    (trips
+     | "Key by year" &gt;&gt; beam.Map(lambda r: (r["trip_start_timestamp"].year, r["fare"]))
+     | "Mean per year" &gt;&gt; beam.combiners.Mean.PerKey()
+     | "Sort" &gt;&gt; beam.combiners.ToList()
+     | "Print years" &gt;&gt; beam.Map(lambda rows: [print(f"year {y}  mean fare {m:6.2f}") for y, m in sorted(rows)]))</div>
+      </div>
+      <div class="step">
+        <p><strong>Add the second branch: event time and 30-day windows.</strong> This block stays indented inside the <code>with</code>. <code>TimestampedValue</code> sets each trip's event time; <code>Count.Globally().without_defaults()</code> counts per window and skips empty ones; the last three steps fold the windows back into one list to print.</p>
+        <div class="prompt-box good"><span class="label">★ Step 4 · b5_beam.py, part 3</span>    (trips
+     | "2019 only" &gt;&gt; beam.Filter(lambda r: r["trip_start_timestamp"].year == 2019)
+     | "Event time" &gt;&gt; beam.Map(lambda r: TimestampedValue(r["payment_type"], r["trip_start_timestamp"].timestamp()))
+     | "30-day windows" &gt;&gt; beam.WindowInto(FixedWindows(30 * 24 * 3600))
+     | "Count in window" &gt;&gt; beam.combiners.Count.Globally().without_defaults()
+     | "Collect" &gt;&gt; beam.WindowInto(beam.window.GlobalWindows())
+     | "All windows" &gt;&gt; beam.combiners.ToList()
+     | "Print windows" &gt;&gt; beam.Map(lambda ns: print("2019 trips per 30-day window:", sorted(ns, reverse=True))))</div>
+      </div>
+      <div class="step">
+        <p><strong>Run it and compare with this real output.</strong> Log lines omitted: Beam prints several WARNING and INFO lines around the result, and among them you will see Beam 2.77's DirectRunner start its local Prism runner and report "pipeline done!". Timings and ports vary by machine. The 2020 jump is 12 sampled 15-minute slots, not a finding about Chicago fares.</p>
+        <div class="prompt-box good"><span class="label">★ Step 5 · python b5_beam.py (real output, log lines omitted)</span>year 2013  mean fare  11.29
+year 2014  mean fare  12.52
+year 2015  mean fare  12.93
+year 2016  mean fare  13.86
+year 2017  mean fare  13.09
+year 2018  mean fare  15.11
+year 2019  mean fare  13.40
+year 2020  mean fare  22.74
+year 2021  mean fare  18.93
+year 2022  mean fare  20.80
+year 2023  mean fare  22.26
+2019 trips per 30-day window: [300, 150, 150, 150, 150, 150, 150, 150, 150, 150, 149]</div>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <p><strong>On a billing-enabled project (optional).</strong> Shown, needs a billing-enabled project: the BigQuery sandbox covers BigQuery only, and the $300 Free Trial asks for a card. The Dataflow overview says "To use Dataflow with your Apache Beam pipelines, specify the Dataflow runner", plus a project, a region and a Cloud Storage path for temporary files. The graph does not change; the options do, and the sample file would need to sit in a bucket the workers can read. Workers bill per second while the job runs (Part 3), so cancel anything you start by mistake.</p>
+    </div>
+    <div class="prompt-box good"><span class="label">★ Shown, needs a billing-enabled project · the same pipeline on Dataflow</span>pip install "apache-beam[gcp]==2.77.0"
+python b5_beam.py gs://BUCKET/chicago_taxi_sample.parquet
+
+# in b5_beam.py, swap the options line for:
+opts = PipelineOptions(runner="DataflowRunner", project="PROJECT_ID",
+                       region="asia-southeast1", temp_location="gs://BUCKET/tmp")
+
+# or keep the code as is and pass the same options as flags:
+# --runner=DataflowRunner --project=PROJECT_ID --region=asia-southeast1 --temp_location=gs://BUCKET/tmp</div>
+
+    <div class="prompt-box bad"><span class="label">✗ The habit that turns a test into a bill</span>Point the first draft of a pipeline at Dataflow and debug it there,
+one worker spin-up per typo. Debug on the Direct Runner; send Dataflow a graph that already works.</div>
+  </section>
+
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 6</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li><strong>Count by payment type.</strong> Add a third branch that keys 2019 trips by <code>payment_type</code> and counts them with <code>beam.combiners.Count.PerKey()</code>. Compare with the cash and credit card counts from <a href="b2-bigquery-in-the-sandbox.html">session 2</a>.</li>
+      <li><strong>Change the window.</strong> Swap <code>FixedWindows(30 * 24 * 3600)</code> for <code>FixedWindows(7 * 24 * 3600)</code>. Before you run it, predict how many windows hold data and what each count will be. Then run it.</li>
+      <li><strong>Write the same mean in SQL.</strong> In the BigQuery sandbox, write the <code>GROUP BY</code> that answers "mean fare per year" on the public taxi table, and dry-run it to see the bytes it would process. Which version would you rather own?</li>
+      <li><strong>Sort one real job.</strong> Pick one data job at work and put it through Part 3's two-question test. Write one sentence saying which engine it belongs on and why.</li>
+    </ol>
+  </section>
+
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+    <p>Clear all three and builder session 5 gets stamped in your passport.</p>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">1 · In the build-along, what is <code>trips</code>?</p>
+      <button class="qopt" type="button">A · A Python list of 18,362 dictionaries held in memory</button>
+      <button class="qopt" type="button">B · A PCollection: in the Beam guide's words, "a distributed data set that your Beam pipeline operates on", which transforms read and produce</button>
+      <button class="qopt" type="button">C · A BigQuery table</button>
+      <button class="qopt" type="button">D · The runner that executes the pipeline</button>
+      <p class="qwhy">You never loop over a PCollection yourself; you pass it to PTransforms. Both branches of the build-along read the same <code>trips</code> PCollection.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">2 · You need a 7-day total refreshed every day, so one sale counts in seven windows. Which window type?</p>
+      <button class="qopt" type="button">A · Fixed, because every window has the same length</button>
+      <button class="qopt" type="button">B · Global, because it holds everything</button>
+      <button class="qopt" type="button">C · Sliding: "sliding time windows can overlap", so one element can belong to several windows</button>
+      <button class="qopt" type="button">D · Session, because sales happen in sessions</button>
+      <p class="qwhy">Fixed windows are "non overlapping", so each element lands in one. Session windows close on a gap. Only sliding windows overlap.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">3 · The data is already in a BigQuery table and the job is a nightly total per store. Dataflow or SQL?</p>
+      <button class="qopt" type="button">A · SQL: the data sits in BigQuery and SQL says what you mean, so a scheduled query avoids workers and a job graph to own</button>
+      <button class="qopt" type="button">B · Dataflow, because every pipeline should run on Dataflow</button>
+      <button class="qopt" type="button">C · Dataflow, because it is always cheaper than a query</button>
+      <button class="qopt" type="button">D · Neither; totals cannot be computed in the cloud</button>
+      <p class="qwhy">Dataflow earns its workers for streaming, event-time windows, logic SQL cannot express, or many sources and sinks. A batch total over a BigQuery table is a <code>GROUP BY</code>.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What this session teaches, and where it came from</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Pipeline, PCollection, PTransform, ParDo, GroupByKey, Combine</span><span class="note">Apache Beam programming guide, read at source on 3 November 2026</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Fixed, sliding, session and global windows</span><span class="note">Apache Beam programming guide, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Direct Runner: on your machine, not for production</span><span class="note">Beam, Using the Direct Runner, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">What Dataflow is, and that it executes Beam pipelines</span><span class="note">Dataflow overview, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Dataflow billing units, per-second billing, default-table prices</span><span class="note">Dataflow pricing page, read at source; region of the default table not named in our read, re-verify</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">The build-along output</span><span class="note">Real run on 3 November 2026, apache-beam 2.77.0 (DirectRunner handing to Prism), on the shipped 18,362-trip sample</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Sliding sizes, session gaps, dot positions in the window figure</span><span class="note">Illustrative; only the fixed-window counts are measured</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Tidewater stories and the nightly GROUP BY composite</span><span class="note">Constructed</span></div>
+    </div>
+    <p class="mono" style="margin-top:14px">Every fact on this page, and its verification tier, is recorded in the course's source map.</p>
+  </section>
+
+  <section class="cheat" id="cheatsheet">
+    <h3>Builder session 5 cheat sheet <span>· pin this</span></h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>Pipeline</b><span>The whole task as a graph. It runs when the <code>with</code> block closes.</span></div>
+      <div class="cheat-item"><b>PCollection</b><span>The data flowing between steps. Pass it on; never loop over it.</span></div>
+      <div class="cheat-item"><b>PTransform</b><span>One named step. ParDo per element, GroupByKey per key, Combine to reduce.</span></div>
+      <div class="cheat-item"><b>Windows</b><span>Fixed: no overlap. Sliding: overlap. Session: closed by a gap. Global: one.</span></div>
+      <div class="cheat-item"><b>Runners</b><span>DirectRunner on a laptop for tests; DataflowRunner on Google's workers for production.</span></div>
+      <div class="cheat-item"><b>SQL first</b><span>Data in BigQuery and SQL suffices: write the query. Streams, event time, many systems: Dataflow.</span></div>
+    </div>
+  </section>
+
+  <div class="callout next">
+    <span class="nx-pill">Next session</span>
+    <p>Not every job needs a pipeline; some need a small piece of code that wakes up when a file lands. Session 6 runs an ingest function on your laptop with the functions framework, sends it a good and a bad request, and draws the line between Cloud Run services, jobs and functions.</p>
+  </div>
+
+  <footer class="pagefoot">
+    <span>Builder session 5 of 8 · learn-gcp-with-phoebe · by Phoebe Fu &nbsp;·&nbsp; 📚 <a href="https://phoebefu6.github.io/learn-with-phoebe/">Learn with Phoebe ↗</a></span>
+    <span><a href="b4-iam-as-gcp-evaluates-it.html">← Prev: IAM as GCP evaluates it</a> &nbsp;·&nbsp; <a href="b6-cloud-run-or-a-function.html">Next: Cloud Run or a function →</a></span>
+  </footer>
+
+</main>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Leader session 5 of 6. What BigQuery's bill actually counts: on-demand bytes and the 10 MB minimum, partitions and clusters, editions and slots, storage and egress, and the four controls from a budget alert to maximum bytes billed.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="The bytes behind the bill - learn gcp with phoebe">
+<meta property="og:description" content="Leader session 5 of 6. One query, four rungs: 77.03 GiB, 4.58 GiB, 27 MB, 10 MB. $2,814.50 a month on demand against $960.00 for a reservation, and the one control that stops a query before it bills.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/courses/a5-the-bytes-behind-the-bill.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="The bytes behind the bill - learn gcp with phoebe">
+<meta name="twitter:description" content="Leader session 5 of 6. On-demand bytes, slots and editions, storage, and the controls that stop spend.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Leader session 5 · The bytes behind the bill - learn gcp with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=2">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-gcp-with-phoebe</a> / Leader session 5 of 6</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn GCP with Phoebe · Leader track · Session 5 of 6</div>
+    <h1>The bytes behind <span class="accent">the bill</span></h1>
+    <p class="sub">A BigQuery bill is not a mystery; it is arithmetic on a handful of documented rules. Tonight we do that arithmetic on one real public table, rung by rung, from a <code>SELECT *</code> that bills 77.03 GiB down to a query that bills the 10 MB floor. Then we price the alternative, a slot reservation, and finish with the four controls a leader can put in place, sorted by the one question that matters: does it tell you, or does it stop it?</p>
+    <div class="chip-row">
+      <span class="chip level">🟠 Applied</span>
+      <span class="chip audience">Data and AI leaders, managers, architects</span>
+      <span class="chip audience">No code, no account</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:4">3-18 · Bytes, slots, controls</span>
+      <span class="a3" style="flex:5">18-40 · Build-along: Tidewater's bill drill</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where we start</h2>
+    </div>
+    <p class="lede">Session 1 gave you one sentence: <code>SELECT *</code> on the public Chicago taxi table costs $0.4701 a run, and three named columns cost $0.0280. Tonight we explain every digit of it and add the two rungs below. All the numbers come from the builder bench, which meters the City of Chicago "Taxi Trips (2013-2023)" table (211,670,894 rows) from BigQuery's documented data type sizes; <a href="b8-the-gcp-iam-and-cost-bench.html">builder session 8</a> lets you move every lever live. Prices are BigQuery's pricing page, us-central1, read on 3 November 2026. Prices change without notice: re-verify before you quote any of them.</p>
+
+    <div class="legend">
+      <span class="pill">🎫 Clear all three quiz questions to stamp your passport</span>
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">★ Build-along = you make the artifact</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> A three-line cost control plan for a BI project, Tidewater's tw-bi-prod or your own, with a quota, a per-query byte limit and a budget alert, each placed where it acts, plus one sentence for the CFO: a dashboard running the wide query 200 times a day bills $2,814.50 a month on demand; naming three columns brings it to $161.55, and partitioning brings it inside the free TiB.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers on-demand bytes and the 10 MB minimum</span>
+      <h2>Four rungs down one query</h2>
+      <span class="tag concept">6 min live</span>
+    </div>
+    <p class="lede">On demand, BigQuery charges "$6.25 / 1 tebibyte" processed (us-central1, BigQuery pricing page, 3 November 2026), and "The first 1 TiB of query data processed per month is free." What counts as processed is the sum, over the columns a query references, of each value's logical size. So the levers are columns, then rows: name fewer columns, then let partitions and clusters skip the rows you did not ask for.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 368" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A staircase of four steps for one query on the Chicago taxi table, from the builder bench. Step one, SELECT star, all 23 columns: 77.03 GiB, 0.4701 dollars a run. Step two, three named columns: 4.58 GiB, 0.0280 dollars. Step three, plus day partitions, January 2019 only: 27 MB billed, 0.0002 dollars. Step four, highlighted, plus clustering, modelled: 3.83 MB processed but 10 MB billed, the minimum.">
+        <defs>
+          <filter id="a5aSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="149" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+        </defs>
+        <style>
+          .a5aH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .a5aL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .a5aS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a5aV { font: 800 18px Inter, sans-serif; fill: #174EA6; }
+          .a5aA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .a5aN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="a5aH" x="30" y="26">ONE QUERY, FOUR RUNGS: WHAT ONE RUN BILLS ON DEMAND (BUILDER BENCH CANON)</text>
+
+        <g filter="url(#a5aSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="40" y="60" width="190" height="240" rx="8" transform="rotate(-0.4 135 180)" fill="#E8F0FE"/>
+          <rect x="240" y="124" width="190" height="176" rx="8" transform="rotate(0.4 335 212)" fill="#FFFFFF"/>
+          <rect x="440" y="184" width="190" height="116" rx="8" transform="rotate(-0.4 535 242)" fill="#FFFFFF"/>
+          <rect x="640" y="220" width="200" height="80" rx="8" transform="rotate(0.6 740 260)" fill="#FBBC04"/>
+          <path d="M30 304 L850 304" stroke="#DADCE0"/>
+        </g>
+
+        <text class="a5aL" x="56" y="84">SELECT *</text>
+        <text class="a5aS" x="56" y="102">23 columns, every row</text>
+        <text class="a5aV" x="56" y="136">77.03 GiB</text>
+        <text class="a5aL" x="56" y="158">$0.4701 a run</text>
+
+        <text class="a5aA" x="244" y="114">drop 20 columns</text>
+        <text class="a5aL" x="256" y="148">three named columns</text>
+        <text class="a5aS" x="256" y="166">3 columns, every row</text>
+        <text class="a5aV" x="256" y="198">4.58 GiB</text>
+        <text class="a5aL" x="256" y="220">$0.0280 a run</text>
+
+        <text class="a5aA" x="444" y="174">read 31 days, not 11 years</text>
+        <text class="a5aL" x="456" y="208">+ day partitions</text>
+        <text class="a5aS" x="456" y="226">January 2019 only</text>
+        <text class="a5aV" x="456" y="256">27 MB billed</text>
+        <text class="a5aL" x="456" y="278">$0.0002 a run</text>
+
+        <text class="a5aA" x="644" y="210">skip blocks: 36 of 257</text>
+        <text class="a5aL" x="656" y="244">+ cluster (modelled)</text>
+        <text class="a5aL" x="656" y="264">3.83 MB processed</text>
+        <text class="a5aL" x="656" y="284">10 MB billed: the floor</text>
+
+        <text class="a5aN" x="30" y="330">Chicago taxi table, 211,670,894 rows. $6.25 per TiB, us-central1, BigQuery pricing page, 3 November 2026.</text>
+        <text class="a5aN" x="30" y="350">MB here means 2^20 bytes, as on the bench. Cluster rung modelled on 5,000-row blocks. Re-verify prices.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow rung reads less than it pays for: below 10 MB, the minimum decides the bill</figcaption>
+    </figure>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>What on-demand actually counts<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>Logical bytes per value.</strong> BigQuery's data type sizes give 8 bytes for a number or timestamp, 2 plus the text's length for a string, and nothing for a NULL. Across all 23 columns the taxi table averages 390.7 logical bytes a row; taxi_id alone is 130.0, because it is a long string. That is how 211,670,894 rows become 77.03 GiB.</p>
+        <p><strong>Only the columns referenced.</strong> "You're charged according to the total data processed in the columns you select". Three columns are 4.58 GiB of the 77.03.</p>
+        <p><strong>LIMIT changes nothing.</strong> On-demand bills the bytes read "even if you set an explicit LIMIT"; Google's cost page puts it plainly: "applying a LIMIT clause to a query doesn't affect the amount of data that is read." <code>SELECT * ... LIMIT 10</code> still bills 77.03 GiB.</p>
+        <p><strong>The rounding rule.</strong> "Charges are rounded up to the nearest MB, with a minimum 10 MB data processed per table referenced by the query, and with a minimum 10 MB data processed per query." That is why the clustered rung reads 3.83 MB and bills 10.</p>
+        <p><strong>What is free.</strong> "You aren't charged for queries that return an error or for queries that retrieve results from the cache."</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Why the dry run is an upper bound on clustered tables<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A dry run asks BigQuery for a query's bytes before running it. On clustered tables it cannot be exact: Google's clustered tables page says "the number of blocks to scan isn't known until a query runs, you don't receive an accurate cost estimate before execution", and the estimate "is an upper bound".</p>
+        <p>The consequence shows up with the maximum bytes billed control in Part 3. That limit is checked against the estimate, so on a clustered table a query can fail even though the bytes it would actually have read were under the limit. Set the limit with headroom over the clustered rung, not tight against it. The bench's cluster rung (36 of 257 blocks read) is a model of BigQuery's block layout, not the real one, which Google does not publish.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The preview that read the whole table.</strong> An analyst exploring a new table types <code>SELECT * ... LIMIT 10</code> to "just look at a few rows", many times a day, on the widest table in the warehouse. Each look bills every byte of every column. A query naming the three or four columns they cared about would have shown the same rows for a small fraction of the bytes. The story is a constructed composite; the LIMIT rule is Google's.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers capacity: editions, slots, autoscaling, commitments</span>
+      <h2>Paying for slots instead of bytes</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">The other compute model buys capacity. A slot is a virtual CPU, and capacity is "measured in slots (virtual CPUs) over time". You choose an edition, set a reservation with a baseline that is always allocated, and let it autoscale above that. Then the bytes a query reads no longer change the bill; the hours your slots run do. For a workload that reads a great deal in predictable hours, that can be much cheaper.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 352" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A slot reservation over an illustrative day. A baseline of 100 slots is always allocated. During a busy period the reservation autoscales up by 50 slots, then by another 50, then back down, always in multiples of 50, highlighted. On the right, pay-as-you-go prices per slot-hour in the pricing page's default table, us-central1: Standard 0.04 dollars, Enterprise 0.06 dollars with 1-year 0.048 and 3-year 0.036, Enterprise Plus 0.10 dollars; US multi-region not verified; billed per second with a one-minute minimum. Below, the monthly comparison: SELECT star 200 times a day costs 2,814.50 dollars on demand against 960 dollars for 100 Standard slots for 8 hours a day.">
+        <defs>
+          <filter id="a5bSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="151" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+        </defs>
+        <style>
+          .a5bH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .a5bL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .a5bS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a5bA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .a5bB { font: 800 11px Inter, sans-serif; fill: #6B4A00; }
+          .a5bN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="a5bH" x="30" y="26">A RESERVATION: A BASELINE, PLUS AUTOSCALE IN STEPS OF 50 SLOTS</text>
+
+        <g filter="url(#a5bSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="62" y="180" width="498" height="80" fill="#E8F0FE" stroke="#174EA6"/>
+          <rect x="200" y="140" width="240" height="40" fill="#FBBC04"/>
+          <rect x="280" y="100" width="100" height="40" fill="#FBBC04"/>
+          <path d="M60 58 L60 262 L562 262"/>
+          <path d="M56 220 L60 220 M56 180 L60 180 M56 140 L60 140 M56 100 L60 100" stroke="#5F6368"/>
+          <rect x="600" y="48" width="250" height="214" rx="10" transform="rotate(0.5 725 155)" fill="#FFFFFF"/>
+        </g>
+
+        <text class="a5bA" x="68" y="52">slots</text>
+        <text class="a5bS" x="50" y="264" text-anchor="end">0</text>
+        <text class="a5bS" x="50" y="224" text-anchor="end">50</text>
+        <text class="a5bS" x="50" y="184" text-anchor="end">100</text>
+        <text class="a5bS" x="50" y="144" text-anchor="end">150</text>
+        <text class="a5bS" x="50" y="104" text-anchor="end">200</text>
+        <text class="a5bA" x="62" y="282">an illustrative working day</text>
+
+        <text class="a5bL" x="78" y="226">baseline: 100 slots, always allocated</text>
+        <text class="a5bL" x="212" y="166">autoscale +50</text>
+        <text class="a5bL" x="292" y="126">+50 more</text>
+
+        <text class="a5bL" x="616" y="74">Pay-as-you-go, per slot-hour</text>
+        <text class="a5bS" x="616" y="98">Standard: $0.04</text>
+        <text class="a5bS" x="616" y="118">Enterprise: $0.06</text>
+        <text class="a5bS" x="628" y="136">1-year $0.048 · 3-year $0.036</text>
+        <text class="a5bS" x="616" y="156">Enterprise Plus: $0.10</text>
+        <text class="a5bS" x="616" y="182">us-central1, pricing page,</text>
+        <text class="a5bS" x="616" y="198">3 November 2026</text>
+        <text class="a5bB" x="616" y="220">US multi-region: not verified</text>
+        <text class="a5bS" x="616" y="244">per second, one-minute minimum</text>
+
+        <text class="a5bL" x="30" y="310">SELECT * 200 times a day: $2,814.50 a month on demand. 100 Standard slots, 8 h a day: $960.00.</text>
+        <text class="a5bN" x="30" y="334">Modelled: assumes the reservation is billed for the 8 hours set. The day's shape is illustrative.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow blocks are autoscaling: capacity added in 50-slot steps when the work needs it, billed only while it runs</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The monthly comparison, and its assumption<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The bench's default: one dashboard query run 200 times a day for 30 days. On demand, <code>SELECT *</code> bills 451.32 TiB a month, $2,814.50 after the free TiB. The three-column version bills 26.85 TiB, $161.55. The partitioned rung bills 0.15 TiB and the clustered rung 0.06 TiB, both $0.00, inside the free TiB.</p>
+        <p>The capacity alternative: a 100-slot Standard reservation for 8 hours a day is 24,000 slot-hours a month at $0.04, $960.00; on Enterprise at $0.06 it is $1,440.00, or $1,152.00 at the 1-year price. The assumption, labelled because it is ours: the reservation is billed for the hours you set, and the queries fit inside those slots.</p>
+        <table class="clean">
+          <tr><th>Habit, 200 runs a day</th><th>On demand, a month</th><th>100 Standard slots, 8 h a day</th></tr>
+          <tr><td><code>SELECT *</code></td><td>$2,814.50</td><td>$960.00</td></tr>
+          <tr><td>Three named columns</td><td>$161.55</td><td>$960.00</td></tr>
+          <tr><td>+ day partitions</td><td>$0.00 (free TiB)</td><td>$960.00</td></tr>
+        </table>
+        <p>Read the table the right way. A reservation beats on-demand for the wasteful habit; naming three columns beats both. Fix the query before you buy capacity. Prices: BigQuery pricing page, us-central1, 3 November 2026; re-verify before you rely on them.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Editions, autoscaling and commitments<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>"BigQuery provides three editions": Standard, Enterprise and Enterprise Plus. "The baseline is the minimum number of slots that will always be allocated to the reservation", and above it "Slots always autoscale to a multiple of 50." Capacity "is billed per second with a one-minute minimum duration by default."</p>
+        <p>Two catches for a leader. First, Standard has "No access to BigQuery ML", so a team that plans models in SQL needs Enterprise or above. Second, commitments, the discount for promising capacity in advance, exist only on Enterprise and Enterprise Plus: "1-year commitment at 20% discount or 3-year commitment at 40% discount." That is where $0.048 and $0.036 come from.</p>
+        <p>One honest gap: the slot prices above come from the pricing page's default table, which lists us-central1 first. We could not verify the prices for the US multi-region, so do not assume they are identical; check the region picker on the pricing page for your own location.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The reservation bought to fix a query.</strong> Alarmed by an on-demand bill, a team buys a slot reservation sized for its busiest dashboard. The bill drops. Six months later someone rewrites the dashboard to name its columns, and finds it would have cost a small fraction of the reservation on demand. The capacity was a sensible purchase for the wrong problem. The story is a constructed composite; the arithmetic is the bench's.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-3">
+    <div class="section-kicker">
+      <span class="klabel">Part 3 · covers storage, egress, and the controls that stop spend</span>
+      <h2>Controls that tell you, and controls that stop it</h2>
+      <span class="tag concept">4 min live</span>
+    </div>
+    <p class="lede">Most cost controls report. Few prevent. A leader needs to know which is which before an incident, because a report that arrives after the money is spent is a post-mortem, not a control. Google Cloud offers four that matter for BigQuery, and they sit at very different points on that line.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 304" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A track from tells you on the left to stops it on the right, with four controls. Budget alerts: alerts only, doesn't automatically cap spending. Spend cap budgets: new, one project and one eligible service, BigQuery not eligible, Preview reported. Custom query quotas: per project or per user per day, default 200 TiB per project per day. Maximum bytes billed, highlighted: set on a query, and over the limit the query fails without incurring a charge.">
+        <defs>
+          <filter id="a5cSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="163" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <marker id="a5cAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .a5cH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .a5cL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .a5cS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a5cA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .a5cN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="a5cH" x="30" y="26">FOUR BIGQUERY COST CONTROLS, FROM "TELLS YOU" TO "STOPS IT"</text>
+
+        <g filter="url(#a5cSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M40 104 L846 104" stroke="#1A73E8" stroke-width="4" marker-end="url(#a5cAr)"/>
+          <circle cx="130" cy="104" r="8" fill="#FFFFFF"/>
+          <circle cx="340" cy="104" r="8" fill="#FFFFFF"/>
+          <circle cx="550" cy="104" r="8" fill="#FFFFFF"/>
+          <circle cx="760" cy="104" r="9" fill="#FBBC04"/>
+          <path d="M130 114 L130 136 M340 114 L340 136 M550 114 L550 136 M760 115 L760 136"/>
+          <rect x="30" y="140" width="200" height="130" rx="10" transform="rotate(-0.8 130 205)" fill="#FFFFFF"/>
+          <rect x="240" y="140" width="200" height="130" rx="10" transform="rotate(0.7 340 205)" fill="#FFFFFF"/>
+          <rect x="450" y="140" width="200" height="130" rx="10" transform="rotate(-0.6 550 205)" fill="#FFFFFF"/>
+          <rect x="660" y="140" width="200" height="130" rx="10" transform="rotate(0.8 760 205)" fill="#FBBC04"/>
+        </g>
+
+        <text class="a5cA" x="40" y="88">tells you</text>
+        <text class="a5cA" x="790" y="88">stops it</text>
+
+        <text class="a5cL" x="46" y="166">Budget, alerts only</text>
+        <text class="a5cS" x="46" y="186">"doesn't automatically cap"</text>
+        <text class="a5cS" x="46" y="204">spending; it notifies you</text>
+        <text class="a5cS" x="46" y="222">once costs are reported</text>
+
+        <text class="a5cL" x="256" y="166">Spend cap budget</text>
+        <text class="a5cS" x="256" y="186">new; one project and</text>
+        <text class="a5cS" x="256" y="204">one eligible service</text>
+        <text class="a5cS" x="256" y="222">BigQuery is not eligible</text>
+        <text class="a5cS" x="256" y="240">Preview (reported)</text>
+
+        <text class="a5cL" x="466" y="166">Custom query quotas</text>
+        <text class="a5cS" x="466" y="186">per project or per user,</text>
+        <text class="a5cS" x="466" y="204">bytes a day</text>
+        <text class="a5cS" x="466" y="222">project default: 200 TiB</text>
+        <text class="a5cS" x="466" y="240">a day</text>
+
+        <text class="a5cL" x="676" y="166">Maximum bytes billed</text>
+        <text class="a5cL" x="676" y="186">set on each query</text>
+        <text class="a5cL" x="676" y="206">over the limit, it fails</text>
+        <text class="a5cL" x="676" y="226">without incurring</text>
+        <text class="a5cL" x="676" y="246">a charge</text>
+
+        <text class="a5cN" x="30" y="294">The order is ours. Quotas stop a day's later queries; maximum bytes billed stops the one query.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow control is the only one that refuses an expensive query before it bills</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The four controls, in Google's words<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>Budgets.</strong> "Setting an alerts-only budget doesn't automatically cap Google Cloud or Google Maps Platform usage or spending." A budget alert is a smoke detector, not a sprinkler.</p>
+        <p><strong>Spend caps.</strong> New: "Spend caps are a cost control mechanism. A spend cap is enforced when usage costs exceed your budget target amount." They are "limited to budgets that are scoped to a single Google Cloud project and a single eligible service", and the eligible list is "Gemini API, Agent Platform (formerly known as Vertex AI), Cloud Run, and Cloud Run functions". BigQuery is not on it. "Any overage due to cost reporting latency is billed as usual." Secondary sources report the feature as Preview; the page we read does not say.</p>
+        <p><strong>Custom quotas.</strong> QueryUsagePerDay caps a project, QueryUsagePerUserPerDay caps each user. The project default is "200 Tebibytes (TiB) of data processed per project per day". Hit the project quota and "BigQuery stops working for everyone in that project" until it resets, so a per-user quota is usually the kinder first line.</p>
+        <p><strong>Maximum bytes billed.</strong> Set on a query: if the query would bill more, "the query fails without incurring a charge". It is the only one of the four that refuses the expensive query itself.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Storage and network lines<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Storage is the quiet meter. In us-central1 (BigQuery pricing page, 3 November 2026), active logical storage is $0.000031507 per GiB-hour, "For 1 TiB for a full month, you pay $23.552"; long-term logical is $0.000021918. Physical storage is $0.000054795 active and $0.000027397 long-term, and time travel and fail-safe charges apply to physical storage. The first 10 GiB each month are free. Prices change: re-verify before you rely on them.</p>
+        <p>Moving data between regions has its own line: "Cross-region load jobs are billed for network usage under Network Data Transfer SKUs." For Tidewater, keeping the landing bucket and the BigQuery datasets in the same region, as session 1 suggested, keeps that line at zero for loads.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The budget alert that arrived after the money was spent.</strong> A team sets a monthly budget with alerts at 50%, 90% and 100%, and feels protected. Over a weekend a scheduled job with a bad join runs the same wide query again and again. The 100% email arrives on Monday morning, after the spend. Nothing failed: an alerts-only budget does exactly what its page says, and "doesn't automatically cap" spending. A maximum bytes billed on the job's queries would have stopped the first run. The story is a constructed composite.</p>
+    </div>
+  </section>
+
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>Tidewater's bill drill</h2>
+      <span class="tag demo">★ 22 min · everyone builds</span>
+    </div>
+    <p class="lede">Paper only. tw-bi-prod is the constructed Tidewater project where the store managers' dashboards run. Assume its busiest dashboard behaves like the bench's taxi query. Write three controls for that project, a per-user quota, a maximum bytes billed on every query the dashboard runs, and a budget alert, each with where it is set and what it does; then write one sentence for the CFO. To try different numbers, move the levers on the bench in <a href="b8-the-gcp-iam-and-cost-bench.html">builder session 8</a>.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 262" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A hand-drawn worksheet with four columns: control, where, setting, what it does. Three rows for the constructed project tw-bi-prod. The first row is worked: maximum bytes billed, on the dashboard's queries in tw-bi-prod, 5 GiB per query, constructed; SELECT star at 77.03 GiB fails with no charge. Rows for the per-user quota and the budget alert are left blank. A yellow tab asks which control stops the money rather than reporting it.">
+        <defs>
+          <filter id="a5dSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="167" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+        </defs>
+        <style>
+          .a5dH { font: 800 11px Inter, sans-serif; fill: #202124; letter-spacing: .04em; }
+          .a5dL { font: 600 11px Inter, sans-serif; fill: #202124; }
+          .a5dS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a5dN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#a5dSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="24" width="820" height="152" rx="8" transform="rotate(-0.3 440 100)" fill="#FFFFFF"/>
+          <path d="M30 56 L850 56"/>
+          <path d="M210 24 L210 176 M410 24 L410 176 M590 24 L590 176" stroke="#DADCE0"/>
+          <path d="M40 96 L840 96 M40 136 L840 136" stroke="#E8EAED"/>
+          <rect x="36" y="60" width="808" height="32" rx="4" fill="#E8F0FE" stroke="#E8F0FE"/>
+          <rect x="30" y="192" width="370" height="28" rx="6" transform="rotate(0.6 215 206)" fill="#FBBC04"/>
+        </g>
+
+        <text class="a5dH" x="44" y="45">CONTROL</text>
+        <text class="a5dH" x="222" y="45">WHERE</text>
+        <text class="a5dH" x="422" y="45">SETTING</text>
+        <text class="a5dH" x="602" y="45">WHAT IT DOES</text>
+        <text class="a5dL" x="44" y="81">maximum bytes billed</text>
+        <text class="a5dS" x="222" y="81">tw-bi-prod dashboard</text>
+        <text class="a5dS" x="422" y="81">5 GiB a query</text>
+        <text class="a5dS" x="602" y="81">SELECT * (77.03 GiB) fails, free</text>
+        <text class="a5dL" x="44" y="121">per-user quota</text>
+        <text class="a5dS" x="222" y="121">?</text>
+        <text class="a5dS" x="422" y="121">?</text>
+        <text class="a5dS" x="602" y="121">?</text>
+        <text class="a5dL" x="44" y="160">budget alert</text>
+        <text class="a5dS" x="222" y="160">?</text>
+        <text class="a5dS" x="422" y="160">?</text>
+        <text class="a5dS" x="602" y="160">?</text>
+        <text class="a5dL" x="44" y="211">Which control stops the money, not just reports it?</text>
+
+        <text class="a5dN" x="418" y="211">Rows and settings constructed; byte counts from the bench.</text>
+        <text class="a5dN" x="30" y="248">Three controls, three places. The tinted row is worked; the 5 GiB setting is ours, not Google's.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - one row worked; the column that matters is "what it does", read as tells you or stops it</figcaption>
+    </figure>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>Price the habit.</strong> From the ladder: the dashboard's wide query bills 77.03 GiB a run, the named-column version 4.58 GiB. At 200 runs a day that is $2,814.50 against $161.55 a month on demand (us-central1, BigQuery pricing page, 3 November 2026; re-verify).</p>
+      </div>
+      <div class="step">
+        <p><strong>Set the limit that stops it.</strong> Work the first row together. The limit must sit above the query you want and below the one you do not.</p>
+        <div class="prompt-box good"><span class="label">★ Worked example: maximum bytes billed</span>Control:   maximum bytes billed
+Where:     each query the dashboard runs in tw-bi-prod (a per-query setting)
+Setting:   5 GiB per query (constructed: above 4.58 GiB, far below 77.03 GiB)
+Does:      the three-column query runs; SELECT * fails
+           "without incurring a charge"
+Watch:     on clustered tables the estimate "is an upper bound",
+           so leave headroom</div>
+      </div>
+      <div class="step">
+        <p><strong>Add the per-user quota and the budget alert.</strong> Choose a daily per-user cap with QueryUsagePerUserPerDay, so one person's mistake cannot exhaust the project for everyone. Then a budget with alerts for the project, written down honestly as "tells us", not "stops it".</p>
+      </div>
+      <div class="step">
+        <p><strong>Write the CFO sentence.</strong> One sentence, with the numbers, the control and what it does not cover.</p>
+        <div class="prompt-box good"><span class="label">★ The sentence, with the bench's numbers</span>The store dashboard would cost $2,814.50 a month reading every column;
+named columns bring it to $161.55, and day partitions bring it inside
+the free TiB. A 5 GiB per-query limit now refuses the wide version
+before it bills. Our budget alert reports; it does not stop spend.
+(BigQuery on-demand, us-central1, pricing page of 3 November 2026)</div>
+      </div>
+      <div class="step">
+        <p><strong>Do it for your own BI project.</strong> Find your widest dashboard query, its run count and its bytes. Write the same three rows. If you cannot fill "what it does" for a control, you do not yet know whether you have one.</p>
+      </div>
+    </div>
+
+    <div class="prompt-box bad"><span class="label">✗ The cost plan that only reports</span>a budget alert at 100% and "we will react"
+a slot reservation bought before anyone looked at the query
+LIMIT 10 added to every dashboard query to "make it cheaper"</div>
+
+    <div class="callout tip">
+      <p><strong>Sort every control into "tells you" or "stops it".</strong> In a cost review, write that label next to each control the team claims to have. A plan with only "tells you" controls is a reporting plan. It is useful, but it is not protection.</p>
+    </div>
+  </section>
+
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 6</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li><strong>Find your widest query.</strong> Ask for the query in your BigQuery project that bills the most bytes in a month, and how many columns it reads.</li>
+      <li><strong>Check for a byte limit.</strong> Ask whether any service account or scheduled job runs with maximum bytes billed set. Note the answer, including "no".</li>
+      <li><strong>Read the quotas.</strong> Find whether your project still uses the default 200 TiB a day, and whether any per-user quota exists.</li>
+      <li><strong>Bring your three rows.</strong> Session 6 puts Tidewater's whole platform on one page, with cost and access controls on every box. Bring your cost rows to add to yours.</li>
+    </ol>
+  </section>
+
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+    <p>Clear all three and leader session 5 gets stamped in your passport.</p>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">1 · An analyst adds <code>LIMIT 10</code> to <code>SELECT *</code> on the 77.03 GiB taxi table. What does the query bill on demand?</p>
+      <button class="qopt" type="button">A · About 10 rows' worth of bytes</button>
+      <button class="qopt" type="button">B · The 10 MB minimum</button>
+      <button class="qopt" type="button">C · Still 77.03 GiB: a LIMIT does not affect the amount of data read</button>
+      <button class="qopt" type="button">D · Nothing, because previews are free</button>
+      <p class="qwhy">Google: "applying a LIMIT clause to a query doesn't affect the amount of data that is read." The levers are columns, partitions and clusters, not LIMIT.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="3">
+      <p class="qtext">2 · Which control stops a runaway BigQuery query before it bills?</p>
+      <button class="qopt" type="button">A · An alerts-only budget at 100%</button>
+      <button class="qopt" type="button">B · A spend cap budget on the BigQuery service</button>
+      <button class="qopt" type="button">C · A slot reservation</button>
+      <button class="qopt" type="button">D · Maximum bytes billed: over the limit, the query fails without incurring a charge</button>
+      <p class="qwhy">An alerts-only budget "doesn't automatically cap" spending, and BigQuery is not an eligible service for spend caps. Maximum bytes billed refuses the query itself.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">3 · The clustered rung processes 3.83 MB but bills 10 MB. Why?</p>
+      <button class="qopt" type="button">A · Clustering adds a fixed fee per query</button>
+      <button class="qopt" type="button">B · Charges have a minimum of 10 MB per table referenced and per query</button>
+      <button class="qopt" type="button">C · The dry run estimate is always billed instead of the actual bytes</button>
+      <button class="qopt" type="button">D · The partition filter was ignored</button>
+      <p class="qwhy">"Charges are rounded up to the nearest MB, with a minimum 10 MB data processed per table referenced by the query, and with a minimum 10 MB data processed per query." Below 10 MB, the floor decides.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What this session teaches, and where it came from</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">On-demand price, free TiB, rounding and 10 MB minimum, errors and cache, slot prices, storage prices, cross-region loads</span><span class="note">BigQuery pricing page, us-central1 default table, read 3 November 2026; prices change, re-verify</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">LIMIT does not reduce bytes; maximum bytes billed; dry run as an upper bound</span><span class="note">Estimate and control costs; best practices for costs; clustered tables page, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Custom quotas and their defaults</span><span class="note">Create custom query quotas, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Editions, baseline, autoscaling in 50s, commitments, no BigQuery ML on Standard</span><span class="note">Understand BigQuery editions; understand slots, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Alerts-only budgets; spend caps and eligible services</span><span class="note">Budgets and spend cap budgets pages, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">77.03 GiB, 4.58 GiB, 27 MB, monthly figures</span><span class="note">Computed by the builder bench from data type sizes and the City of Chicago portal's row counts</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Cluster rung and the reservation comparison</span><span class="note">Modelled: 5,000-row blocks; the reservation billed for the hours set</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Spend caps in Preview; slot prices for the US multi-region</span><span class="note">Reported only, and not verified, respectively</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Tidewater's controls, the 5 GiB setting and the four stories</span><span class="note">Constructed: a fictional company and composites of common patterns</span></div>
+    </div>
+    <p class="mono" style="margin-top:14px">Every fact on this page, and its verification tier, is recorded in the course's source map.</p>
+  </section>
+
+  <section class="cheat" id="cheatsheet">
+    <h3>Leader session 5 cheat sheet <span>· pin this</span></h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>On demand</b><span>$6.25 per TiB, first TiB a month free (us-central1, 3 Nov 2026). Re-verify.</span></div>
+      <div class="cheat-item"><b>The ladder</b><span>77.03 GiB, 4.58 GiB, 27 MB, 10 MB: columns, partitions, clusters, then the floor.</span></div>
+      <div class="cheat-item"><b>Free and not</b><span>Errors and cache: free. LIMIT: no saving. Minimum 10 MB per table and per query.</span></div>
+      <div class="cheat-item"><b>Capacity</b><span>Slot-hours. Baseline plus autoscale in 50s. Standard $0.04, no BigQuery ML.</span></div>
+      <div class="cheat-item"><b>The comparison</b><span>Wide query: $2,814.50 on demand vs $960.00 reserved. Named columns: $161.55.</span></div>
+      <div class="cheat-item"><b>Stops it</b><span>Maximum bytes billed fails the query at no charge. Budgets only tell you.</span></div>
+    </div>
+  </section>
+
+  <div class="callout next">
+    <span class="nx-pill">Next session</span>
+    <p>Five sessions, five pieces: the tree, the warehouse and the lake, the gates, the pipelines and the bill. Session 6 puts them on one page for Tidewater, end to end from the store till to the dashboard, with every box tagged by its project, its meter and its owner, and adds the governance layer: policy tags, row-level security and Knowledge Catalog.</p>
+  </div>
+
+  <footer class="pagefoot">
+    <span>Leader session 5 of 6 · learn-gcp-with-phoebe · by Phoebe Fu &nbsp;·&nbsp; 📚 <a href="https://phoebefu6.github.io/learn-with-phoebe/">Learn with Phoebe ↗</a></span>
+    <span><a href="a4-pipelines-without-servers.html">← Prev: Pipelines without servers</a> &nbsp;·&nbsp; <a href="a6-tidewaters-platform-on-one-page.html">Next: Tidewater's platform on one page →</a></span>
+  </footer>
+
+</main>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

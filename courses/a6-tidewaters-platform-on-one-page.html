@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Leader session 6 of 6. Tidewater Grocers' whole Google Cloud data platform on one page: the reference architecture with every meter named, governance with Knowledge Catalog, policy tags and row-level security, an owner and a control for every project, and six questions to ask any proposal.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="Tidewater's platform on one page - learn gcp with phoebe">
+<meta property="og:description" content="Leader session 6 of 6. One page that shows where the data flows, who can see which column, who owns each project, and which six questions every GCP data proposal must answer.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/courses/a6-tidewaters-platform-on-one-page.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Tidewater's platform on one page - learn gcp with phoebe">
+<meta name="twitter:description" content="Leader session 6 of 6. Architecture, governance, ownership and six review questions, on one page.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Leader session 6 · Tidewater's platform on one page - learn gcp with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=2">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-gcp-with-phoebe</a> / Leader session 6 of 6</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn GCP with Phoebe · Leader track · Session 6 of 6</div>
+    <h1>Tidewater's platform on <span class="accent">one page</span></h1>
+    <p class="sub">Five sessions built five sheets: the hierarchy, where the data sits, who gets in, how it moves, and what it costs. Tonight they become one page. You walk Tidewater Grocers' data from the store tills to the dashboards with every meter named, fence the sensitive columns and rows, give every project an owner and a control, and leave with six questions that make any Google Cloud data proposal answer for itself.</p>
+    <div class="chip-row">
+      <span class="chip level">🔴 Capstone</span>
+      <span class="chip audience">Data and AI leaders, managers, architects</span>
+      <span class="chip audience">No code, no account</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:4">3-18 · Architecture, governance, ownership</span>
+      <span class="a3" style="flex:5">18-40 · Build-along: the one page</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where we start</h2>
+    </div>
+    <p class="lede">A platform that fits on one page can be reviewed, owned and explained to a board. One that needs a deck of forty slides usually cannot. Tidewater Grocers, the constructed APAC grocery chain these pages have followed, has an organization <code>tidewater.example</code>, three folders, three projects, three datasets in production, a landing bucket and six people with different needs. Tonight we put all of it on one sheet, and the sheet becomes the template for yours.</p>
+
+    <div class="legend">
+      <span class="pill">🎫 Clear all three quiz questions to stamp your passport</span>
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">★ Build-along = you make the artifact</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> Tidewater's platform on one page, filled in as a worked example, and the same page started for your own platform: hierarchy, data placement, access, pipelines and controls in five boxes. Plus six questions to ask of any proposal, in the order that saves the most time: which project, which location, who pays, which meter, which deny, which ceiling.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers the reference architecture (constructed)</span>
+      <h2>From the till to the dashboard</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">Tidewater's architecture is constructed, but every piece of it is a real Google Cloud service used the way its documentation describes. Sales files land in Cloud Storage with hive-style names. A Cloud Run function (formerly Cloud Functions) validates each file and loads it into BigQuery's <code>sales_raw</code>. Scheduled SQL, which uses "features of BigQuery Data Transfer Service", or a Dataflow job turns raw into <code>sales_curated</code>, partitioned by day and clustered by store area. Dashboards in a separate project read the curated table. Loyalty sign-ups arrive as events through Pub/Sub into the fenced <code>loyalty_pii</code> dataset.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 402" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tidewater's constructed platform. POS files from the store tills land in the landing bucket in project tw-lake-prod, metered by bytes stored. A Cloud Run function validates each file, metered by requests and seconds, and loads BigQuery dataset sales_raw, metered by bytes stored and read. Scheduled SQL or Dataflow turns it into sales_curated, partitioned by day and clustered, the table everyone reads, highlighted. BI dashboards in project tw-bi-prod read sales_curated, metered by bytes read per refresh. A sign-up app publishes loyalty events to Pub/Sub, which writes to loyalty_pii, tagged pii and fenced by a deny. The project also carries a deny so only the pipeline writes production tables.">
+        <defs>
+          <filter id="a6aSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="73" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="a6aHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="a6aAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .a6aH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .a6aL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .a6aS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a6aA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .a6aN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="a6aH" x="30" y="26">TIDEWATER GROCERS (CONSTRUCTED): EVERY BOX NAMES ITS PROJECT AND ITS METER</text>
+
+        <g filter="url(#a6aSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="76" width="120" height="70" rx="8" transform="rotate(-1.5 90 111)" fill="url(#a6aHc)"/>
+          <rect x="170" y="44" width="680" height="226" rx="12" transform="rotate(0.2 510 157)" fill="#E8F0FE"/>
+          <rect x="186" y="76" width="146" height="70" rx="8" transform="rotate(-1 259 111)" fill="#FFFFFF"/>
+          <rect x="356" y="76" width="150" height="70" rx="8" transform="rotate(1 431 111)" fill="#FFFFFF"/>
+          <rect x="530" y="76" width="136" height="70" rx="8" transform="rotate(-0.8 598 111)" fill="#FFFFFF"/>
+          <rect x="690" y="76" width="144" height="70" rx="8" transform="rotate(0.8 762 111)" fill="#FFFFFF" stroke-dasharray="7 5"/>
+          <rect x="320" y="170" width="180" height="82" rx="8" transform="rotate(-1 410 211)" fill="#FBBC04"/>
+          <rect x="530" y="170" width="136" height="82" rx="8" transform="rotate(1 598 211)" fill="#FFFFFF"/>
+          <rect x="690" y="170" width="144" height="82" rx="8" transform="rotate(-1 762 211)" fill="#FFFFFF"/>
+          <rect x="170" y="290" width="420" height="80" rx="10" transform="rotate(-0.3 380 330)" fill="#FFFFFF"/>
+          <rect x="186" y="322" width="200" height="38" rx="6" fill="#E8F0FE"/>
+          <rect x="690" y="300" width="144" height="56" rx="8" transform="rotate(1.5 762 328)" fill="#FFFFFF"/>
+          <path d="M154 111 L180 111" marker-end="url(#a6aAr)"/>
+          <path d="M336 111 L350 111" marker-end="url(#a6aAr)"/>
+          <path d="M510 111 L524 111" marker-end="url(#a6aAr)"/>
+          <path d="M598 150 L598 164" marker-end="url(#a6aAr)"/>
+          <path d="M526 211 L506 211" marker-end="url(#a6aAr)"/>
+          <path d="M360 256 L300 316" marker-end="url(#a6aAr)"/>
+          <path d="M762 166 L762 152" marker-end="url(#a6aAr)"/>
+          <path d="M762 296 L762 258" marker-end="url(#a6aAr)"/>
+        </g>
+
+        <text class="a6aL" x="42" y="106">POS files</text>
+        <text class="a6aS" x="42" y="124">store tills</text>
+        <text class="a6aL" x="186" y="64">project tw-lake-prod, folder data-platform</text>
+
+        <text class="a6aL" x="198" y="98">landing bucket</text>
+        <text class="a6aS" x="198" y="116">sales/dt=.../</text>
+        <text class="a6aA" x="198" y="134">bytes stored</text>
+        <text class="a6aL" x="368" y="98">Cloud Run function</text>
+        <text class="a6aS" x="368" y="116">validates each file</text>
+        <text class="a6aA" x="368" y="134">requests, seconds</text>
+        <text class="a6aL" x="542" y="98">sales_raw</text>
+        <text class="a6aS" x="542" y="116">BigQuery dataset</text>
+        <text class="a6aA" x="542" y="134">stored + read</text>
+        <text class="a6aL" x="702" y="98">loyalty_pii</text>
+        <text class="a6aS" x="702" y="116">tag pii = true</text>
+        <text class="a6aA" x="702" y="134">fenced by a deny</text>
+
+        <text class="a6aS" x="186" y="192">deny at this project:</text>
+        <text class="a6aS" x="186" y="210">only the pipeline</text>
+        <text class="a6aS" x="186" y="228">writes prod tables</text>
+        <text class="a6aL" x="334" y="194">sales_curated</text>
+        <text class="a6aL" x="334" y="214">by day, clustered</text>
+        <text class="a6aL" x="334" y="234">read by everyone</text>
+        <text class="a6aL" x="542" y="194">scheduled SQL</text>
+        <text class="a6aS" x="542" y="212">or Dataflow</text>
+        <text class="a6aA" x="542" y="232">bytes or vCPU-time</text>
+        <text class="a6aL" x="702" y="194">Pub/Sub</text>
+        <text class="a6aS" x="702" y="212">to loyalty_pii</text>
+        <text class="a6aA" x="702" y="232">events</text>
+
+        <text class="a6aL" x="400" y="312">tw-bi-prod, analytics</text>
+        <text class="a6aL" x="198" y="346">BI dashboards</text>
+        <text class="a6aA" x="400" y="346">bytes read, per refresh</text>
+        <text class="a6aL" x="702" y="324">sign-up app</text>
+        <text class="a6aS" x="702" y="342">loyalty sign-ups</text>
+
+        <text class="a6aN" x="30" y="392">Constructed for Tidewater. Services are real; the yellow table is the one every dashboard and analyst reads.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow table is where most of the bill and most of the access questions land, so it gets partitions, clusters and the tightest grants</figcaption>
+    </figure>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>Walk the data once, naming the meter at every step<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Read the figure left to right and say the meter out loud at each box. The landing bucket bills bytes stored by class. The Cloud Run function bills requests and compute seconds. BigQuery bills <code>sales_raw</code> and <code>sales_curated</code> twice: bytes stored, and bytes read by every query. Dataflow, if Tidewater uses it, is "billed in per second increments, on a per job basis" for workers, memory and shuffle. The dashboards in <code>tw-bi-prod</code> read the curated table on every refresh, which is why session 5 put its biggest number on that arrow: a wide query 200 times a day bills 451.32 TiB a month on demand.</p>
+        <p>Notice what the separate BI project buys. Analysts get <code>roles/bigquery.user</code> in <code>tw-bi-prod</code> and read access on one dataset in <code>tw-lake-prod</code>, so their query jobs run from the BI project (a constructed design choice) and the data project's grants stay small.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Why loyalty arrives as events, and what that costs in design<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Sales come in daily files, so a function per file is enough. Loyalty sign-ups happen one at a time all day, so they arrive as Pub/Sub messages and a BigQuery subscription writes them into <code>loyalty_pii</code>. The design consequence is Google's default: "By default, Pub/Sub offers at-least-once delivery with no ordering guarantees", so the same sign-up can arrive twice and the curated view of members must de-duplicate. Pipeline design itself is taught in <a href="https://phoebefu6.github.io/learn-data-pipelines-with-phoebe/">data pipelines</a> and streaming in <a href="https://phoebefu6.github.io/learn-streaming-data-with-phoebe/">streaming data</a>; these pages stop at which Google Cloud service carries which workload.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The diagram with no meters on it.</strong> A platform team presents a clean architecture diagram: logos, arrows, a lake and a warehouse. Asked what it will cost, they answer with the storage estimate. Nobody asks which arrow runs 200 times a day, and the dashboard arrow turns out to be the bill. The story is a constructed composite; adding one meter label per box is the whole fix.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers governance: Knowledge Catalog, policy tags, row-level security</span>
+      <h2>Fence the column, filter the row, catalogue the rest</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">IAM decides who reaches a table. Inside the table, two more controls decide what they see. Column-level access control restricts columns with "policy tags", and it "is enforced in addition to existing dataset ACLs". Row-level security pairs a grantee list with a filter expression that "functions like a WHERE clause in a typical query". Above both sits Knowledge Catalog (formerly Dataplex Universal Catalog, renamed on 10 April 2026), which lets you "unify technical metadata and business semantics across structured and unstructured data".</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 350" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Knowledge Catalog drawn as a metadata layer above the loyalty members table, unifying technical metadata and business semantics, with profiling scans for schema anomalies and statistical drift. The table has four columns: member_id, country, member_email and points. The member_email column is highlighted: it carries a policy tag, so reading it needs the Fine-Grained Reader role, enforced in addition to dataset access. A row access policy grants the group analysts-sg the rows where country equals SG, a filter that works like a WHERE clause.">
+        <defs>
+          <filter id="a6bSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="79" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <marker id="a6bAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .a6bL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .a6bS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a6bA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .a6bN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#a6bSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="34" width="820" height="62" rx="10" transform="rotate(-0.2 440 65)" fill="#E8F0FE"/>
+          <rect x="30" y="126" width="520" height="184" rx="8" transform="rotate(0.3 290 218)" fill="#FFFFFF"/>
+          <rect x="292" y="130" width="126" height="176" rx="5" fill="#FBBC04"/>
+          <path d="M30 160 L550 160 M30 196 L550 196 M30 232 L550 232 M30 268 L550 268 M160 126 L160 310 M290 126 L290 310 M420 126 L420 310"/>
+          <rect x="580" y="126" width="270" height="86" rx="8" transform="rotate(-0.8 715 169)" fill="#FFFFFF"/>
+          <rect x="580" y="224" width="270" height="86" rx="8" transform="rotate(0.8 715 267)" fill="#FFFFFF"/>
+          <path d="M576 168 L558 168" marker-end="url(#a6bAr)"/>
+          <path d="M576 266 L558 266" marker-end="url(#a6bAr)"/>
+        </g>
+
+        <text class="a6bL" x="46" y="58">Knowledge Catalog (formerly Dataplex): the metadata layer over every table</text>
+        <text class="a6bS" x="46" y="80">"unify technical metadata and business semantics"; profiling scans for "schema anomalies and statistical drift"</text>
+
+        <text class="a6bL" x="42" y="148">member_id</text>
+        <text class="a6bL" x="172" y="148">country</text>
+        <text class="a6bL" x="302" y="148">member_email</text>
+        <text class="a6bL" x="432" y="148">points</text>
+        <text class="a6bL" x="42" y="183">m-1001</text>
+        <text class="a6bL" x="172" y="183">SG</text>
+        <text class="a6bL" x="302" y="183">policy tag</text>
+        <text class="a6bL" x="432" y="183">120</text>
+        <text class="a6bS" x="42" y="219">m-1002</text>
+        <text class="a6bS" x="172" y="219">MY</text>
+        <text class="a6bL" x="302" y="219">policy tag</text>
+        <text class="a6bS" x="432" y="219">45</text>
+        <text class="a6bS" x="42" y="255">m-1003</text>
+        <text class="a6bS" x="172" y="255">ID</text>
+        <text class="a6bL" x="302" y="255">policy tag</text>
+        <text class="a6bS" x="432" y="255">310</text>
+        <text class="a6bL" x="42" y="291">m-1004</text>
+        <text class="a6bL" x="172" y="291">SG</text>
+        <text class="a6bL" x="302" y="291">policy tag</text>
+        <text class="a6bL" x="432" y="291">80</text>
+
+        <text class="a6bL" x="594" y="150">Column: member_email</text>
+        <text class="a6bS" x="594" y="170">policy tag; reading it needs</text>
+        <text class="a6bA" x="594" y="188">datacatalog.categoryFineGrainedReader</text>
+        <text class="a6bS" x="594" y="204">on top of dataset access</text>
+        <text class="a6bL" x="594" y="248">Rows: row access policy</text>
+        <text class="a6bS" x="594" y="268">grantee list: analysts-sg</text>
+        <text class="a6bA" x="594" y="286">filter: country = 'SG'</text>
+        <text class="a6bS" x="594" y="302">works like a WHERE clause</text>
+
+        <text class="a6bN" x="30" y="336">Rows, group and values constructed for Tidewater's loyalty_pii.members. Ink rows: what analysts-sg would see.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow column is fenced for everyone without the fine-grained role, even people who can read the rest of the table</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Three layers, three questions<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>Can they reach the table?</strong> IAM, from session 3: a dataset grant, inherited down, with deny policies checked first. Tidewater's organization-level deny already keeps everyone except the privacy officers away from tables tagged <code>pii = true</code>. <strong>Which columns can they read?</strong> Policy tags. The <code>member_email</code> column carries one, and only principals with Fine-Grained Reader, role ID <code>datacatalog.categoryFineGrainedReader</code>, can read it, in addition to whatever dataset access they hold. Taxonomies "are regional resources, like BigQuery datasets and tables", so they live where the data lives. <strong>Which rows?</strong> A row access policy: a grantee list and a filter expression, so the Singapore analysts see Singapore members only.</p>
+        <p>The ideas behind these controls, role-based and attribute-based access, masking, access reviews, belong to <a href="https://phoebefu6.github.io/learn-data-access-control-with-phoebe/">data access control</a>. A leader's job here is narrower: ask, for each sensitive column, which of the three layers fences it.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>What Knowledge Catalog adds, and what changed in the name<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Google's note on the rename: "As of April 10, 2026, Dataplex Universal Catalog is now called Knowledge Catalog. The API, client library, CLI, and IAM names remain unchanged." So scripts and roles still say <code>dataplex</code>; the analysts' Data Viewer role in builder session 4 includes several <code>dataplex.*</code> permissions for exactly that reason. The catalog's job for a leader is findability and early warning: its profiling scans check for "schema anomalies and statistical drift", which is how you learn that a source changed before the dashboard does. Older material describes Dataplex lakes, zones and assets; current documentation no longer does, so treat that model as legacy rather than designing around it.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The email column in every extract.</strong> A loyalty team shares member tables with three departments by granting dataset access, and each department exports what it needs. A year on, member emails sit in a dozen spreadsheets. A policy tag on one column would have let every department keep its access to points and tiers while the emails stayed behind one role. The story is a constructed composite.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-3">
+    <div class="section-kicker">
+      <span class="klabel">Part 3 · covers ownership and the review questions</span>
+      <h2>An owner and a control for every project</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">A platform without owners is a platform where every incident starts with "whose is this?". Tidewater names one owner per project and one control on each meter. One caution from Google's budgets page decides how those controls are chosen: "Setting an alerts-only budget doesn't automatically cap Google Cloud or Google Maps Platform usage or spending." The newer spend-cap budgets work only for a single project and a single eligible service, and the eligible list, "Gemini API, Agent Platform (formerly known as Vertex AI), Cloud Run, and Cloud Run functions", does not include BigQuery. So BigQuery's real brakes are the ones session 5 taught: per-query ceilings and daily quotas.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 384" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three project cards. tw-lake-prod in folder data-platform: owner the data platform lead, an alerts-only budget, a per-user daily query quota, and its own deny, only the pipeline writes production tables, plus a folder deny on contractors deleting. tw-bi-prod in folder analytics: owner the analytics lead, a budget alert plus maximum bytes billed on dashboard queries, and the organization's PII fence inherited. tw-lake-dev in folder sandbox: owner the data-eng lead, a budget alert, a contractor grant that expires on 31 December 2026, and only the organization's PII fence. Below, highlighted, six questions to ask of any proposal: which project, which location, who pays, which meter, which deny protects the sensitive data, and what is the per-query ceiling.">
+        <defs>
+          <filter id="a6cSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="83" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+        </defs>
+        <style>
+          .a6cL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .a6cS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a6cA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .a6cN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#a6cSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="34" width="260" height="160" rx="10" transform="rotate(-0.8 160 114)" fill="#FFFFFF"/>
+          <rect x="310" y="34" width="260" height="160" rx="10" transform="rotate(0.6 440 114)" fill="#FFFFFF"/>
+          <rect x="590" y="34" width="260" height="160" rx="10" transform="rotate(-0.6 720 114)" fill="#E8F0FE"/>
+          <rect x="30" y="214" width="820" height="136" rx="10" transform="rotate(0.2 440 282)" fill="#FBBC04"/>
+        </g>
+
+        <text class="a6cL" x="46" y="58">tw-lake-prod</text>
+        <text class="a6cS" x="46" y="76">folder data-platform</text>
+        <text class="a6cS" x="46" y="100">owner: data platform lead</text>
+        <text class="a6cS" x="46" y="120">budget: alerts only, no cap</text>
+        <text class="a6cS" x="46" y="140">quota: per user, per day</text>
+        <text class="a6cA" x="46" y="160">deny: only the pipeline writes</text>
+        <text class="a6cA" x="46" y="178">folder deny: contractors delete</text>
+
+        <text class="a6cL" x="326" y="58">tw-bi-prod</text>
+        <text class="a6cS" x="326" y="76">folder analytics</text>
+        <text class="a6cS" x="326" y="100">owner: analytics lead</text>
+        <text class="a6cS" x="326" y="120">budget: alerts only, no cap</text>
+        <text class="a6cS" x="326" y="140">ceiling: max bytes billed</text>
+        <text class="a6cA" x="326" y="160">deny: org PII fence, inherited</text>
+
+        <text class="a6cL" x="606" y="58">tw-lake-dev</text>
+        <text class="a6cS" x="606" y="76">folder sandbox</text>
+        <text class="a6cS" x="606" y="100">owner: data-eng lead</text>
+        <text class="a6cS" x="606" y="120">budget: alerts only, no cap</text>
+        <text class="a6cS" x="606" y="140">contractor grant ends 31 Dec 2026</text>
+        <text class="a6cA" x="606" y="160">deny: org PII fence only</text>
+
+        <text class="a6cL" x="46" y="240">Six questions for any Google Cloud data proposal, in this order</text>
+        <text class="a6cL" x="46" y="270">1 · Which project, under which folder?</text>
+        <text class="a6cL" x="46" y="298">2 · Which location?</text>
+        <text class="a6cL" x="46" y="326">3 · Who pays: which billing account?</text>
+        <text class="a6cL" x="450" y="270">4 · Which meter runs, and how often?</text>
+        <text class="a6cL" x="450" y="298">5 · Which deny protects the sensitive data?</text>
+        <text class="a6cL" x="450" y="326">6 · What is the per-query ceiling?</text>
+
+        <text class="a6cN" x="30" y="374">Owners and controls constructed for Tidewater; the budget, quota and ceiling behaviours are Google's documented ones.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow list is the part to keep: the cards change per company, the six questions do not</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The six questions, and why this order<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>Which project</strong> comes first because it settles the next three by inheritance: the folder's policies, the billing account, the owner. <strong>Which location</strong> next, because it decides where the bytes physically sit, and cross-region loads are "billed for network usage under Network Data Transfer SKUs". <strong>Who pays</strong>: a billing account "defines who pays for a given set of Google Cloud resources". <strong>Which meter</strong>, and how often it runs: bytes read, slot-hours or compute seconds, times the refresh rate. <strong>Which deny</strong> protects the sensitive data, because allow policies only add. <strong>What ceiling</strong> stops one bad query: <code>maximum_bytes_billed</code>, under which "the query fails without incurring a charge", and the per-user daily quota.</p>
+        <p>A proposal that cannot answer one of these is not wrong, but it is not finished. Ask for the missing answer before asking about anything else.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The Well-Architected Framework, as a checklist behind the questions<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Google's Well-Architected Framework (the URL still says "architecture framework") has six pillars: "Operational excellence", "Security, privacy, and compliance", "Reliability", "Cost optimization", "Performance optimization" and "Sustainability". The six questions above lean on two of them, security and cost, because those are where data platforms most often go wrong first. Use the pillars as the longer checklist when a proposal passes the six questions and you want to look for what is missing: who is paged when the load fails, what happens if a region is lost, how fast the dashboard must be.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The Professional Data Engineer exam, and where these pages meet it<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Google's certification page lists the exam at 2 hours, "40 - 50 multiple choice and multiple select questions", and a $200 registration fee (certification page, 3 November 2026; re-verify before you book). Its exam guide has five sections, and these pages cover parts of each:</p>
+        <ul>
+          <li><strong>1 · Designing data processing systems (~22%).</strong> Leader sessions 1, 3 and 6; builder session 4. Not taught: data migrations.</li>
+          <li><strong>2 · Ingesting and processing the data (~25%).</strong> Leader session 4; builder sessions 5 and 6. Not taught: Cloud Composer DAGs (Composer is "evolving to become Managed Service for Apache Airflow"), Datastream, change data capture.</li>
+          <li><strong>3 · Storing the data (~20%).</strong> Leader session 2; builder sessions 1, 2 and 3. Not taught: Bigtable, Spanner, AlloyDB, Cloud SQL.</li>
+          <li><strong>4 · Preparing and using data for analysis (~15%).</strong> Leader session 2; builder session 7. Not taught: Looker, BigQuery sharing (formerly Analytics Hub).</li>
+          <li><strong>5 · Maintaining and automating data workloads (~18%).</strong> Leader session 5; builder sessions 3 and 8. Not taught: monitoring and alerting in depth.</li>
+        </ul>
+        <p>Also outside these pages: GKE, networking and VPC Service Controls beyond a mention, principal access boundary policies, custom-role authoring and BigQuery Omni. The official route is Google's learning path 16, "Professional Data Engineer Certification", on skills.google (formerly Cloud Skills Boost). Certificates and labs stay with Google; these pages are a way to understand the platform, not a substitute for the exam's own preparation.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The architecture review that asked only about services.</strong> A review board spends an hour on whether a new workload should use Dataflow or a managed Spark cluster, approves it, and moves on. Nobody asks which project it lands in. It lands in the analytics project, inherits the analysts' broad grants, bills to the wrong cost centre, and has no deny in front of the customer data it reads. Every one of those problems was one question away. The story is a constructed composite.</p>
+    </div>
+  </section>
+
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>The one page</h2>
+      <span class="tag demo">★ 22 min · everyone builds</span>
+    </div>
+    <p class="lede">Paper again, and the five sheets from sessions 1 to 5. Each sheet becomes one box on a single page. Tidewater's answers are filled in below as the worked example; write yours beside them. Where your answer is "unknown", write that: an honest gap on the page is worth more than a confident guess.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 290" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A one-page template. A title strip reads: the platform on one page. Below it five boxes, one per earlier session: 1 hierarchy, organization, folders, projects, owner and payer; 2 data placement, datasets, buckets, locations, tables; 3 access, bindings plus one deny; 4 pipelines, a route per workload and its meter; 5 controls, budgets, ceilings and quotas.">
+        <defs>
+          <filter id="a6dSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="89" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+        </defs>
+        <style>
+          .a6dL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .a6dS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a6dA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .a6dN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#a6dSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="34" width="820" height="210" rx="10" transform="rotate(-0.2 440 139)" fill="#FFFFFF"/>
+          <rect x="46" y="46" width="788" height="34" rx="6" fill="#FBBC04"/>
+          <rect x="46" y="96" width="150" height="132" rx="8" transform="rotate(-1 121 162)" fill="#E8F0FE"/>
+          <rect x="204" y="96" width="150" height="132" rx="8" transform="rotate(0.8 279 162)" fill="#E8F0FE"/>
+          <rect x="362" y="96" width="150" height="132" rx="8" transform="rotate(-0.8 437 162)" fill="#E8F0FE"/>
+          <rect x="520" y="96" width="150" height="132" rx="8" transform="rotate(1 595 162)" fill="#E8F0FE"/>
+          <rect x="678" y="96" width="150" height="132" rx="8" transform="rotate(-1 753 162)" fill="#E8F0FE"/>
+        </g>
+
+        <text class="a6dL" x="60" y="68">The platform on one page: owner, date, and the six questions answered</text>
+        <text class="a6dL" x="58" y="122">1 · Hierarchy</text>
+        <text class="a6dA" x="58" y="140">from session 1</text>
+        <text class="a6dS" x="58" y="164">org, folders, projects</text>
+        <text class="a6dS" x="58" y="182">owner and payer</text>
+        <text class="a6dL" x="216" y="122">2 · Data placement</text>
+        <text class="a6dA" x="216" y="140">from session 2</text>
+        <text class="a6dS" x="216" y="164">datasets, buckets,</text>
+        <text class="a6dS" x="216" y="182">locations, tables</text>
+        <text class="a6dL" x="374" y="122">3 · Access</text>
+        <text class="a6dA" x="374" y="140">from session 3</text>
+        <text class="a6dS" x="374" y="164">bindings per level,</text>
+        <text class="a6dS" x="374" y="182">plus the denies</text>
+        <text class="a6dL" x="532" y="122">4 · Pipelines</text>
+        <text class="a6dA" x="532" y="140">from session 4</text>
+        <text class="a6dS" x="532" y="164">a route per workload</text>
+        <text class="a6dS" x="532" y="182">and its meter</text>
+        <text class="a6dL" x="690" y="122">5 · Controls</text>
+        <text class="a6dA" x="690" y="140">from session 5</text>
+        <text class="a6dS" x="690" y="164">budgets, ceilings,</text>
+        <text class="a6dS" x="690" y="182">daily quotas</text>
+
+        <text class="a6dN" x="30" y="272">Five boxes, one per earlier sheet. If a box will not fit, the platform is not yet understood, or it is two platforms.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow strip is a rule, not a title: the page carries an owner and a date, or it goes stale unnoticed</figcaption>
+    </figure>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>Box 1, hierarchy.</strong> Copy your session 1 tree onto one line per project: folder, project, owner, who pays.</p>
+        <div class="prompt-box good"><span class="label">★ Worked example · Tidewater box 1 (constructed)</span>org tidewater.example
+  data-platform / tw-lake-prod   owner: data platform lead   pays: Tidewater billing account
+  analytics     / tw-bi-prod     owner: analytics lead       pays: Tidewater billing account
+  sandbox       / tw-lake-dev    owner: data-eng lead        pays: Tidewater billing account</div>
+      </div>
+      <div class="step">
+        <p><strong>Box 2, data placement.</strong> From session 2: every dataset and bucket, its location, and which tables are native and which read files.</p>
+        <div class="prompt-box good"><span class="label">★ Worked example · Tidewater box 2 (constructed)</span>tw-lake-prod:  bucket tw-lake-prod-landing   sales/dt=YYYY-MM-DD/part-N.parquet
+               sales_raw       native tables, loaded by the function
+               sales_curated   native, partitioned by day, clustered by store area
+               loyalty_pii     native, tag pii = true
+location:      one region for all of the above (pick one; write it here)</div>
+      </div>
+      <div class="step">
+        <p><strong>Box 3, access.</strong> From session 3: the bindings at each level, then the deny rules, written last because they are checked first.</p>
+        <div class="prompt-box good"><span class="label">★ Worked example · Tidewater box 3 (constructed)</span>analysts       BigQuery Data Viewer   dataset sales_curated
+analysts       BigQuery User          project tw-bi-prod
+data-eng       BigQuery Data Editor   folder data-platform
+contractors    BigQuery Data Editor   project tw-lake-dev, until 31 Dec 2026
+ingest-pipeline  Data Editor          project tw-lake-prod, if name starts with sales_raw
+deny  org            everyone except privacy-officers: read tables tagged pii = true
+deny  data-platform  contractors: delete tables and datasets
+deny  tw-lake-prod   everyone except ingest-pipeline: write tables tagged env = prod</div>
+      </div>
+      <div class="step">
+        <p><strong>Box 4, pipelines.</strong> From session 4: one line per workload, the route, and the meter it runs on.</p>
+        <div class="prompt-box good"><span class="label">★ Worked example · Tidewater box 4 (constructed)</span>daily sales files   Cloud Run function per file   requests and compute seconds
+raw to curated      scheduled SQL                 bytes read per run
+loyalty sign-ups    Pub/Sub to BigQuery           events; de-duplicate (at-least-once)
+dashboards          BigQuery from tw-bi-prod      bytes read per refresh</div>
+      </div>
+      <div class="step">
+        <p><strong>Box 5, controls.</strong> From session 5: what stops the bill, project by project. Remember that a budget alone only alerts.</p>
+        <div class="prompt-box good"><span class="label">★ Worked example · Tidewater box 5 (constructed)</span>all projects   alerts-only budget per project (alerts, does not cap)
+tw-bi-prod     maximum bytes billed on every dashboard query
+tw-lake-prod   QueryUsagePerUserPerDay custom quota
+curated table  partition filter required; queries name their columns
+review         this page, with an owner and a date, every quarter</div>
+      </div>
+    </div>
+
+    <div class="prompt-box bad"><span class="label">✗ The page that looks finished and is not</span>Services: BigQuery, Dataflow, Pub/Sub, Cloud Run   (no project named)
+Access: "least privilege"                          (no bindings, no deny)
+Cost: "within budget"                               (no meter, no ceiling, no owner)</div>
+
+    <div class="callout tip">
+      <p><strong>Ask "which project?" before "which service?", every time.</strong> It is the one question that settles inheritance, billing and ownership at once. Every other row on the page hangs from it.</p>
+    </div>
+  </section>
+
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>After the last session</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li><strong>Finish your page.</strong> All five boxes for your own platform, with an owner and a date at the top. Mark every "unknown".</li>
+      <li><strong>Run the six questions on one live proposal.</strong> Take a design doc or a ticket from work and answer the six questions from it. Count how many it answers on its own.</li>
+      <li><strong>Find one sensitive column.</strong> For it, write which of the three layers fences it today: IAM on the dataset, a policy tag, or a row policy. If none, write what it would take.</li>
+      <li><strong>Hand one box to a builder.</strong> Give the controls box to someone on the builder track and ask them to set the ceiling and the quota in the sandbox from builder session 2.</li>
+    </ol>
+  </section>
+
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+    <p>Clear all three and leader session 6 gets stamped in your passport.</p>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">1 · Tidewater puts a policy tag on <code>member_email</code>. What does it restrict?</p>
+      <button class="qopt" type="button">A · Which rows of the table a user can see</button>
+      <button class="qopt" type="button">B · Which datasets a user can list</button>
+      <button class="qopt" type="button">C · Reading that one column: it needs Fine-Grained Reader, enforced in addition to the dataset access the user already has</button>
+      <button class="qopt" type="button">D · How much a query on the table may bill</button>
+      <p class="qwhy">Policy tags are column-level access control, "enforced in addition to existing dataset ACLs". Rows are the job of a row access policy.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">2 · Which Tidewater control stops a contractor deleting production tables?</p>
+      <button class="qopt" type="button">A · The deny rule on the data-platform folder, which denies contractors table and dataset deletes and is inherited by tw-lake-prod</button>
+      <button class="qopt" type="button">B · The alerts-only budget on tw-lake-prod</button>
+      <button class="qopt" type="button">C · The policy tag on member_email</button>
+      <button class="qopt" type="button">D · The maximum bytes billed setting</button>
+      <p class="qwhy">Deny policies attach to an organization, folder or project and are inherited downward. The contractors' grant is on the dev project anyway; the folder deny is the floor that holds even if someone later grants them more.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="3">
+      <p class="qtext">3 · A team proposes a new data workload. Which question do you ask first?</p>
+      <button class="qopt" type="button">A · Dataflow or Spark?</button>
+      <button class="qopt" type="button">B · How many slots?</button>
+      <button class="qopt" type="button">C · Which dashboard tool?</button>
+      <button class="qopt" type="button">D · Which project, under which folder: it settles inherited access, the billing account and the owner in one answer</button>
+      <p class="qwhy">Service choice matters, but the project decides who pays, which policies already apply and who answers for it. Ask it first, then location, payer, meter, deny and ceiling.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What this session teaches, and where it came from</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Knowledge Catalog: the rename on 10 April 2026, unchanged API and IAM names, metadata and profiling scans</span><span class="note">Knowledge Catalog introduction, read at source on 3 November 2026</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Policy tags, Fine-Grained Reader, enforced in addition to dataset ACLs; regional taxonomies</span><span class="note">Introduction to column-level access control, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Row-level security: grantee list and a filter that works like a WHERE clause</span><span class="note">Introduction to BigQuery row-level security, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Well-Architected Framework, six pillars</span><span class="note">Google Cloud Well-Architected Framework page, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Professional Data Engineer: length, format, fee, five sections and weights; learning path 16</span><span class="note">Certification page and exam guide PDF, read at source; skills.google path 16</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Alerts-only budgets, spend-cap eligibility, ceilings, quotas, Pub/Sub delivery, Dataflow billing</span><span class="note">Budgets; spend caps; estimate and control costs; Pub/Sub subscriptions; Dataflow pricing, read at source. Spend-cap launch stage is reported, not stated on the page</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Dataplex lakes, zones and assets</span><span class="note">Reported as legacy: gone from current documentation, not taught as current</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Tidewater's architecture, owners, controls, the member rows and the review story</span><span class="note">Constructed; the services and their documented behaviour are real</span></div>
+    </div>
+    <p class="mono" style="margin-top:14px">Every fact on this page, and its verification tier, is recorded in the course's source map.</p>
+  </section>
+
+  <section class="cheat" id="cheatsheet">
+    <h3>Leader session 6 cheat sheet <span>· pin this</span></h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>The flow</b><span>Landing bucket, function, sales_raw, scheduled SQL or Dataflow, sales_curated, dashboards.</span></div>
+      <div class="cheat-item"><b>Three fences</b><span>IAM reaches the table; policy tags fence a column; row policies filter rows.</span></div>
+      <div class="cheat-item"><b>Catalogue</b><span>Knowledge Catalog (formerly Dataplex): metadata, semantics, profiling for drift.</span></div>
+      <div class="cheat-item"><b>Owners</b><span>One owner per project, named on the page, with a date.</span></div>
+      <div class="cheat-item"><b>Brakes</b><span>Budgets alert only. BigQuery's brakes are ceilings and daily quotas.</span></div>
+      <div class="cheat-item"><b>Six questions</b><span>Project, location, payer, meter, deny, ceiling. In that order.</span></div>
+    </div>
+  </section>
+
+  <div class="callout next">
+    <span class="nx-pill">Next session</span>
+    <p>The leader track ends here. To see the numbers behind these pages computed rather than quoted, start the builder track at <a href="b1-cloud-storage-layout-and-parquet.html">builder session 1, Cloud Storage layout and Parquet</a>, or go straight to <a href="b8-the-gcp-iam-and-cost-bench.html">the GCP IAM and cost bench</a>, where Tidewater's access rules and the taxi table's bytes run live in your browser.</p>
+  </div>
+
+  <footer class="pagefoot">
+    <span>Leader session 6 of 6 · learn-gcp-with-phoebe · by Phoebe Fu &nbsp;·&nbsp; 📚 <a href="https://phoebefu6.github.io/learn-with-phoebe/">Learn with Phoebe ↗</a></span>
+    <span><a href="a5-the-bytes-behind-the-bill.html">← Prev: The bytes behind the bill</a> &nbsp;·&nbsp; <a href="../index.html">Course home</a></span>
+  </footer>
+
+</main>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

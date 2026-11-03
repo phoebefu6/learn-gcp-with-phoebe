@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Builder session 7 of 8. BigQuery ML trains, evaluates and predicts with SQL where the data already lives; Vertex AI, now Gemini Enterprise Agent Platform, is the wider ML platform. What the sandbox documents and what it does not, and a fare model fitted on a laptop to read the SQL against.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="Vertex AI and BigQuery ML - learn gcp with phoebe">
+<meta property="og:description" content="Builder session 7 of 8. CREATE MODEL, ML.EVALUATE and ML.PREDICT, an honest answer on the sandbox, and fare = 2.76 + 1.35 x miles + 0.43 x minutes fitted on a laptop.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/courses/b7-vertex-ai-and-bigquery-ml.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Vertex AI and BigQuery ML - learn gcp with phoebe">
+<meta name="twitter:description" content="Builder session 7 of 8. Models in SQL, the sandbox question, and the Agent Platform map.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Builder session 7 · Vertex AI and BigQuery ML - learn gcp with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=2">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-gcp-with-phoebe</a> / Builder session 7 of 8</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn GCP with Phoebe · Builder track · Session 7 of 8</div>
+    <h1>Vertex AI and <span class="accent">BigQuery ML</span></h1>
+    <p class="sub">A data team's first model on Google Cloud is often a SQL statement. BigQuery ML trains, evaluates and predicts inside BigQuery, so the rows never leave the warehouse. When the work outgrows SQL, the wider platform is Vertex AI (now Gemini Enterprise Agent Platform). Tonight you read a <code>CREATE MODEL</code> line by line, get an honest answer about what the sandbox does and does not document, and fit the same fare model on your laptop so you know what the SQL is doing.</p>
+    <div class="chip-row">
+      <span class="chip level">🟠 Applied</span>
+      <span class="chip audience">Data engineers, analytics engineers, analysts who code</span>
+      <span class="chip audience">Python on a laptop, no account</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:4">3-18 · Models in SQL, the sandbox, the platform</span>
+      <span class="a3" style="flex:5">18-40 · Build-along: a fare model, in SQL and on your laptop</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where we start</h2>
+    </div>
+    <p class="lede">Sessions 2 and 3 taught you to read the bytes a query processes before you run it. BigQuery ML adds one twist: the statement that trains a model is priced differently from the queries that evaluate and use it. This session keeps the professional order: understand the SQL, check what the documentation actually says about where it runs, then try it yourself. Model training on a laptop is used only to make the SQL readable; it is not BigQuery ML and these pages never pretend it is.</p>
+
+    <div class="legend">
+      <span class="pill">🎫 Clear all three quiz questions to stamp your passport</span>
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">★ Build-along = you make the artifact</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> A <code>CREATE MODEL</code>, <code>ML.EVALUATE</code> and <code>ML.PREDICT</code> set for a fare model on the public taxi table, ready to try in your own console, and a laptop fit of the same model form on the session 1 sample: fare = 2.76 + 1.35 x miles + 0.43 x minutes, r2 0.883, mean absolute error $2.31 on 2,995 held-out trips.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers BigQuery ML: models in SQL</span>
+      <h2>Three statements, and the data stays put</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">BigQuery ML is a set of SQL statements and functions. <code>CREATE MODEL</code> trains a model from a query's result and stores it in a dataset. <code>ML.EVALUATE</code> "lets you evaluate model metrics". <code>ML.PREDICT</code> is the function "you can use to predict outcomes by using a model". All three run where the table lives, so there is no export, no copy on someone's laptop, and the model is stored in a dataset you already govern.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Inside one BigQuery panel: the taxi_trips table feeds CREATE MODEL, which trains and stores a model; ML.EVALUATE returns model metrics; ML.PREDICT returns predictions in SQL. Under CREATE MODEL, built-in models cost 312.50 dollars per TiB on demand; evaluation and prediction are charged as queries at 6.25 dollars per TiB, with 1 TiB free each month. Below, MODEL_TYPE options include linear regression, logistic regression, k-means, boosted trees, ARIMA_PLUS, PCA, DNN and AutoML.">
+        <defs>
+          <filter id="b7aSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="89" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b7aHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="b7aAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b7aH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b7aL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b7aS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b7aA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b7aN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#b7aSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="44" width="820" height="190" rx="14" transform="rotate(-0.3 440 139)" fill="#FFFFFF"/>
+          <rect x="50" y="92" width="150" height="60" rx="8" transform="rotate(-1 125 122)" fill="url(#b7aHc)"/>
+          <rect x="240" y="92" width="170" height="60" rx="8" transform="rotate(0.8 325 122)" fill="#FBBC04"/>
+          <rect x="450" y="92" width="170" height="60" rx="8" transform="rotate(-0.6 535 122)" fill="#E8F0FE"/>
+          <rect x="660" y="92" width="170" height="60" rx="8" transform="rotate(0.7 745 122)" fill="#E8F0FE"/>
+          <path d="M204 122 L232 122" marker-end="url(#b7aAr)"/>
+          <path d="M414 122 L442 122" marker-end="url(#b7aAr)"/>
+          <path d="M624 122 L652 122" marker-end="url(#b7aAr)"/>
+        </g>
+
+        <text class="b7aH" x="46" y="70">INSIDE BIGQUERY: THE ROWS NEVER LEAVE THE WAREHOUSE</text>
+        <text class="b7aL" x="64" y="118">taxi_trips</text>
+        <text class="b7aL" x="64" y="138">training rows</text>
+        <text class="b7aL" x="254" y="118">CREATE MODEL</text>
+        <text class="b7aL" x="254" y="138">trains, stores model</text>
+        <text class="b7aL" x="464" y="118">ML.EVALUATE</text>
+        <text class="b7aS" x="464" y="138">model metrics</text>
+        <text class="b7aL" x="674" y="118">ML.PREDICT</text>
+        <text class="b7aS" x="674" y="138">predictions, in SQL</text>
+        <text class="b7aA" x="240" y="180">built-in: $312.50 / TiB</text>
+        <text class="b7aS" x="240" y="200">on demand, re-verify</text>
+        <text class="b7aA" x="450" y="180">as a query: $6.25 / TiB</text>
+        <text class="b7aS" x="450" y="200">1 TiB free each month</text>
+        <text class="b7aA" x="660" y="180">as a query: $6.25 / TiB</text>
+        <text class="b7aS" x="660" y="200">1 TiB free each month</text>
+        <text class="b7aL" x="30" y="258">MODEL_TYPE options include:</text>
+        <text class="b7aS" x="30" y="278">LINEAR_REG · LOGISTIC_REG · KMEANS · BOOSTED_TREE_REGRESSOR and _CLASSIFIER · ARIMA_PLUS · PCA · DNN · AUTOML · ...</text>
+
+        <text class="b7aN" x="30" y="304">Prices: on demand, us-central1, BigQuery pricing page, 3 November 2026. Re-verify before quoting.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow box is the one statement priced differently from an ordinary query</figcaption>
+    </figure>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>Reading a CREATE MODEL<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The statement comes in three forms, <code>CREATE MODEL</code>, <code>CREATE MODEL IF NOT EXISTS</code> and <code>CREATE OR REPLACE MODEL</code>, followed by <code>OPTIONS(...)</code>, where <code>MODEL_TYPE</code> is required, an optional <code>TRANSFORM</code>, and <code>AS</code> with the query that supplies the training rows. The label is the column you name in <code>input_label_cols</code>; every other selected column becomes a feature.</p>
+        <p>The <code>MODEL_TYPE</code> list on the CREATE MODEL page is long: linear and logistic regression (<code>LINEAR_REG</code>, <code>LOGISTIC_REG</code>), boosted trees and random forests, DNNs, AutoML, <code>KMEANS</code> for clustering, <code>MATRIX_FACTORIZATION</code>, <code>PCA</code>, <code>AUTOENCODER</code>, the time-series family <code>ARIMA_PLUS</code> and <code>ARIMA_PLUS_XREG</code>, <code>CONTRIBUTION_ANALYSIS</code>, and imported <code>TENSORFLOW</code>, <code>TENSORFLOW_LITE</code>, <code>ONNX</code> and <code>XGBOOST</code> models. Tonight's build-along uses the simplest, <code>LINEAR_REG</code>.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>What a model costs, and which edition has it<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>BigQuery's pricing page treats the steps differently. "BigQuery ML jobs that perform inspection, evaluation, and prediction operations incur the same charges as on-demand query jobs": $6.25 per TiB, inside the same 1 TiB free each month. Training is separate: "Because CREATE MODEL queries incur different charges, you must calculate CREATE MODEL job costs independently". On demand, the row for built-in models (linear, logistic, k-means, PCA, time series, contribution analysis) shows "$312.50 / 1 tebibyte", fifty times the query rate. Our read of that table came from the page's raw HTML, so confirm which model types sit on that row before you budget. Prices: us-central1, BigQuery pricing page, 3 November 2026; re-verify.</p>
+        <p>On capacity pricing, editions decide access: "BigQuery ML is available in Enterprise and Enterprise Plus Editions", and the editions page lists Standard with "No access to BigQuery ML." One more line worth knowing before you train anything large: "The CREATE MODEL statement stops at 50 iterations for iterative models."</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The churn model that never left the warehouse.</strong> An analyst at Tidewater (constructed) needs a first churn score for loyalty members. The old route is an export to a notebook, a copy of personal data on a laptop, and a review nobody wanted. The new route is a <code>CREATE MODEL</code> in the same project as the data, read by the same people who can already read the table. The model is simple; what it saves is the copy.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers the sandbox question, honestly</span>
+      <h2>What the sandbox page says, and what it does not</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">The builder track runs on the BigQuery sandbox, so the obvious question is whether <code>CREATE MODEL</code> runs there. The honest answer, as of 3 November 2026, is that neither the sandbox page nor the pricing page says. BigQuery ML is not on the sandbox page's list of unsupported features, and it is not mentioned anywhere else on that page. An absence is not a rule either way, so these pages do not resolve it: you test it in your own console.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 370" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two panels. Documented, read 3 November 2026: the sandbox needs no card and no billing account; 10 GiB of storage for its lifetime and 1 TiB of queries a month; tables expire after 60 days; streaming, DML and the Data Transfer Service are not supported; BigQuery ML is available in Enterprise and Enterprise Plus; Standard edition has no access to BigQuery ML. Not documented: whether CREATE MODEL runs in the sandbox; neither page lists it either way. Below, a decision: try step 2 in your sandbox; if it runs, note the date you checked; if it is refused, it needs a billing-enabled project.">
+        <defs>
+          <filter id="b7bSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="97" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b7bHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="b7bAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b7bH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b7bL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b7bS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b7bA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b7bN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#b7bSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="44" width="400" height="196" rx="10" transform="rotate(-0.4 230 142)" fill="#FFFFFF"/>
+          <rect x="450" y="44" width="400" height="196" rx="10" transform="rotate(0.4 650 142)" fill="#E8F0FE"/>
+          <rect x="466" y="84" width="368" height="52" rx="6" fill="#FBBC04"/>
+          <rect x="30" y="274" width="220" height="40" rx="8" transform="rotate(-1 140 294)" fill="#FFFFFF"/>
+          <rect x="300" y="256" width="320" height="34" rx="8" transform="rotate(0.6 460 273)" fill="#E8F0FE"/>
+          <rect x="300" y="304" width="320" height="34" rx="8" transform="rotate(-0.6 460 321)" fill="#FFFFFF"/>
+          <path d="M254 288 L292 274" marker-end="url(#b7bAr)"/>
+          <path d="M254 302 L292 318" marker-end="url(#b7bAr)"/>
+        </g>
+
+        <text class="b7bH" x="46" y="68">DOCUMENTED, READ 3 NOVEMBER 2026</text>
+        <text class="b7bL" x="46" y="96">sandbox: no card, no billing account</text>
+        <text class="b7bL" x="46" y="118">10 GiB storage, lifetime; 1 TiB queries a month</text>
+        <text class="b7bL" x="46" y="140">tables expire after 60 days</text>
+        <text class="b7bL" x="46" y="162">not supported: streaming, DML, Transfer Service</text>
+        <text class="b7bL" x="46" y="184">BigQuery ML: Enterprise and Enterprise Plus</text>
+        <text class="b7bL" x="46" y="206">Standard edition: no access to BigQuery ML</text>
+        <text class="b7bH" x="466" y="68">NOT DOCUMENTED ON EITHER PAGE</text>
+        <text class="b7bL" x="480" y="106">Does CREATE MODEL run in the sandbox?</text>
+        <text class="b7bL" x="480" y="126">Neither page says, either way.</text>
+        <text class="b7bS" x="466" y="162">sandbox page: not listed as unsupported,</text>
+        <text class="b7bS" x="466" y="180">and not mentioned anywhere else</text>
+        <text class="b7bS" x="466" y="204">pricing page: silent on the sandbox</text>
+        <text class="b7bL" x="44" y="298">try step 2 in your sandbox</text>
+        <text class="b7bL" x="314" y="278">it runs: note the date you checked</text>
+        <text class="b7bL" x="314" y="326">refused: needs a billing-enabled project</text>
+
+        <text class="b7bN" x="30" y="360">An absent sentence is not a rule. Re-read both pages before you teach this to anyone.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow box is the open question; the arrows are how you close it for yourself</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>How to treat an undocumented answer<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Three things are documented and you can rely on them. The sandbox runs "without providing a credit card or creating a billing account for your project", with "a lifetime limit of 10 GiB of storage" and "the same free compute limit as the BigQuery free tier of 1 TiB of processed query data each month", and tables "automatically expire after 60 days". Its unsupported list is "Streaming data", "Data manipulation language (DML) statements" and "BigQuery Data Transfer Service". And BigQuery ML's pricing is on the pricing page.</p>
+        <p>What is not documented is the link between them. So the build-along labels every <code>CREATE MODEL</code> box "needs a billing-enabled project, confirm in your own console". Run step 2 in your sandbox. If it runs, write down the date: a free product's limits can change without notice. If it is refused, the same SQL runs unchanged on a billing-enabled project. Either result is yours, from your console, not a claim on these pages.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Why the sandbox's storage limit matters for models<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A model is stored in a dataset, next to tables. In the sandbox, storage has a lifetime ceiling, and "This quota is not refunded upon data deletion." So if your sandbox does accept training, small experiments are cheap and large ones spend an allowance you cannot get back. The pricing page's free-tier table says "BigQuery ML models and training data stored in BigQuery are included in the BigQuery storage free tier", so a stored model counts as storage like any table; how its size is measured is not stated there, so keep sandbox models small.</p>
+        <p>The same caution applies to the training query itself: in the sandbox it would draw on the 1 TiB a month, and a <code>CREATE MODEL</code> over a full public table can read a lot of it. Dry-run the <code>AS SELECT</code> part on its own first, exactly as in session 2.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>Two analysts, two answers.</strong> Mei says BigQuery ML works in the sandbox; a colleague says it does not (constructed). Both are reporting what their console did, on different days, and neither wrote the date down. The team's wiki now says "tested on DATE, result X, see the sandbox page" instead of a rule nobody can trace. That is the habit this Part teaches: when the documentation is silent, record evidence, not opinion.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-3">
+    <div class="section-kicker">
+      <span class="klabel">Part 3 · covers Vertex AI (now Gemini Enterprise Agent Platform) as the platform</span>
+      <h2>The platform beyond SQL, under its new name</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">When a model needs custom code, its own training job, a managed endpoint, or a third-party foundation model, the work moves from BigQuery to Google's ML platform. Most people still call it Vertex AI. Since 22 April 2026 Google calls it Gemini Enterprise Agent Platform, Agent Platform for short, and almost every component was renamed with it. Knowing both names is now part of reading any Google Cloud ML material.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A rename table drawn as arrows from old to new names, from the Agent Platform release notes of 22 April 2026. Vertex AI Model Garden becomes Model Garden, where Claude models are found. Vertex AI Workbench becomes Agent Platform Workbench, Jupyter notebooks. Vertex AI Pipelines becomes Agent Platform Pipelines. Vertex AI Model Registry becomes Agent Platform Model Registry. Vertex AI Endpoints becomes Agent Platform Endpoints. Vertex AI Training becomes Agent Platform Managed Training. Vertex AI Studio becomes Agent Studio. Vertex AI Agent Engine becomes Agent Runtime.">
+        <defs>
+          <filter id="b7cSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="101" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b7cHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="b7cAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b7cH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b7cL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b7cS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b7cA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b7cN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#b7cSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="44" width="820" height="282" rx="14" transform="rotate(-0.2 440 185)" fill="#FFFFFF"/>
+          <rect x="40" y="98" width="800" height="24" rx="5" fill="#FBBC04"/>
+          <path d="M250 110 L450 110" marker-end="url(#b7cAr)"/>
+          <path d="M250 138 L450 138" marker-end="url(#b7cAr)" stroke="#5F6368"/>
+          <path d="M250 166 L450 166" marker-end="url(#b7cAr)" stroke="#5F6368"/>
+          <path d="M250 194 L450 194" marker-end="url(#b7cAr)" stroke="#5F6368"/>
+          <path d="M250 222 L450 222" marker-end="url(#b7cAr)" stroke="#5F6368"/>
+          <path d="M250 250 L450 250" marker-end="url(#b7cAr)" stroke="#5F6368"/>
+          <path d="M250 278 L450 278" marker-end="url(#b7cAr)" stroke="#5F6368"/>
+          <path d="M250 306 L450 306" marker-end="url(#b7cAr)" stroke="#5F6368"/>
+        </g>
+
+        <text class="b7cH" x="46" y="68">VERTEX AI (NOW GEMINI ENTERPRISE AGENT PLATFORM): WHAT EACH PART IS CALLED NOW</text>
+        <text class="b7cA" x="50" y="88">BEFORE 22 APRIL 2026</text>
+        <text class="b7cA" x="470" y="88">NOW</text>
+        <text class="b7cL" x="50" y="114">Vertex AI Model Garden</text>
+        <text class="b7cL" x="470" y="114">Model Garden</text>
+        <text class="b7cL" x="700" y="114">Claude lives here</text>
+        <text class="b7cS" x="50" y="142">Vertex AI Workbench</text>
+        <text class="b7cL" x="470" y="142">Agent Platform Workbench</text>
+        <text class="b7cS" x="700" y="142">Jupyter notebooks</text>
+        <text class="b7cS" x="50" y="170">Vertex AI Pipelines</text>
+        <text class="b7cL" x="470" y="170">Agent Platform Pipelines</text>
+        <text class="b7cS" x="700" y="170">serverless ML runs</text>
+        <text class="b7cS" x="50" y="198">Vertex AI Model Registry</text>
+        <text class="b7cL" x="470" y="198">Agent Platform Model Registry</text>
+        <text class="b7cS" x="700" y="198">model lifecycle</text>
+        <text class="b7cS" x="50" y="226">Vertex AI Endpoints</text>
+        <text class="b7cL" x="470" y="226">Agent Platform Endpoints</text>
+        <text class="b7cS" x="50" y="254">Vertex AI Training</text>
+        <text class="b7cL" x="470" y="254">Agent Platform Managed Training</text>
+        <text class="b7cS" x="50" y="282">Vertex AI Studio</text>
+        <text class="b7cL" x="470" y="282">Agent Studio</text>
+        <text class="b7cS" x="50" y="310">Vertex AI Agent Engine</text>
+        <text class="b7cL" x="470" y="310">Agent Runtime</text>
+
+        <text class="b7cN" x="30" y="348">Name pairs verbatim from the Agent Platform release notes, 22 April 2026. Model Garden kept its name.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow row is the one name that did not change, and the one most teams open first</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Four parts a data team actually opens<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>Model Garden</strong> "is an AI/ML model library that helps you discover, test, customize, and deploy models and assets from Google and Google partners." Third-party models live here, Claude among them: "To access a Claude on Google Cloud model, go to its Model Garden model card." How to call Claude there is the subject of <a href="https://phoebefu6.github.io/learn-claude-with-phoebe/courses/68-bedrock-vertex.html">learn-claude, session 68</a>; these pages cover the platform only.</p>
+        <p><strong>Workbench</strong> instances "are Jupyter notebook-based development environments", the place for code that SQL cannot hold. <strong>Pipelines</strong> "lets you automate, monitor, and govern your machine learning (ML) systems in a serverless manner." <strong>Model Registry</strong> "is a central repository where you can manage the lifecycle of" your models, and Endpoints and Managed Training complete the path from notebook to served model.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>BigQuery ML or the platform, and a cap on the bill<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A workable rule: start in BigQuery ML when the training rows are already a query and a listed <code>MODEL_TYPE</code> fits; move to the platform when you need your own training code, a model from Model Garden, or a managed endpoint other systems call. The two meet: BigQuery ML can import <code>TENSORFLOW</code>, <code>ONNX</code> and <code>XGBOOST</code> models, so a model trained elsewhere can still be used with <code>ML.PREDICT</code>.</p>
+        <p>The platform also has a cost control BigQuery lacks. Google's spend-cap budgets cover a single project and a single eligible service, and the eligible list reads "Gemini API, Agent Platform (formerly known as Vertex AI), Cloud Run, and Cloud Run functions". BigQuery is not eligible, so BigQuery ML spend is guarded by the query controls from sessions 2 and 3, not by a cap. The launch stage of spend caps is reported as Preview, not confirmed on the page.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>Two names for one bill.</strong> Tidewater's finance team sees "Agent Platform" on the invoice while the data team's runbook still says "Vertex AI" (constructed). Half a day goes on proving they are the same thing. The fix is one line in the runbook, both names side by side, and a spend-cap budget on the experiment project so a forgotten endpoint cannot run all month.</p>
+    </div>
+  </section>
+
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>A fare model, in SQL and on your laptop</h2>
+      <span class="tag demo">★ 22 min · everyone builds</span>
+    </div>
+    <p class="lede">Two lanes, one model form: a linear regression of fare on trip miles and trip minutes. The first lane is the BigQuery ML SQL, to try in your own console; no output is pasted for it, because the build laptop had no billing-enabled project and these pages do not invent results. The second lane fits the same form on the session 1 sample with numpy and is pasted from a real run. It is not BigQuery ML; it is there so you can read what the SQL asks BigQuery to do.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two lanes. The upper lane, BigQuery ML, shown and to be confirmed in your own console: CREATE MODEL with LINEAR_REG, then ML.EVALUATE, then ML.PREDICT, drawn dashed. The lower lane, your laptop, run tonight and not BigQuery ML: 14,891 clean sample trips go to numpy least squares fitted on 11,896 rows, giving fare equals 2.76 plus 1.35 times miles plus 0.43 times minutes, r2 0.883 on 2,995 held-out trips.">
+        <defs>
+          <filter id="b7dSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="103" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b7dHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="b7dAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b7dL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b7dS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b7dA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b7dW { font: 800 12px Inter, sans-serif; fill: #FFFFFF; }
+          .b7dN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#b7dSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="56" width="240" height="44" rx="8" transform="rotate(-0.8 150 78)" fill="#E8F0FE" stroke-dasharray="7 6"/>
+          <rect x="310" y="56" width="240" height="44" rx="8" transform="rotate(0.6 430 78)" fill="#E8F0FE" stroke-dasharray="7 6"/>
+          <rect x="590" y="56" width="260" height="44" rx="8" transform="rotate(-0.6 720 78)" fill="#E8F0FE" stroke-dasharray="7 6"/>
+          <rect x="30" y="146" width="240" height="56" rx="8" transform="rotate(0.8 150 174)" fill="url(#b7dHc)"/>
+          <rect x="310" y="146" width="240" height="56" rx="8" transform="rotate(-0.6 430 174)" fill="#174EA6" stroke="#174EA6"/>
+          <rect x="590" y="146" width="260" height="56" rx="8" transform="rotate(0.6 720 174)" fill="#FBBC04"/>
+          <path d="M274 78 L302 78" marker-end="url(#b7dAr)" stroke-dasharray="5 5"/>
+          <path d="M554 78 L582 78" marker-end="url(#b7dAr)" stroke-dasharray="5 5"/>
+          <path d="M274 174 L302 174" marker-end="url(#b7dAr)"/>
+          <path d="M554 174 L582 174" marker-end="url(#b7dAr)"/>
+        </g>
+
+        <text class="b7dA" x="30" y="44">BIGQUERY ML, SHOWN: CONFIRM IN YOUR OWN CONSOLE</text>
+        <text class="b7dL" x="46" y="83">CREATE MODEL, LINEAR_REG</text>
+        <text class="b7dL" x="326" y="83">ML.EVALUATE</text>
+        <text class="b7dL" x="606" y="83">ML.PREDICT</text>
+        <text class="b7dA" x="30" y="134">YOUR LAPTOP, RUN TONIGHT (NOT BIGQUERY ML)</text>
+        <text class="b7dL" x="46" y="170">sample, 14,891 clean trips</text>
+        <text class="b7dS" x="46" y="188">after the range filters</text>
+        <text class="b7dW" x="326" y="170">numpy least squares</text>
+        <text class="b7dW" x="326" y="188">fit on 11,896 rows</text>
+        <text class="b7dL" x="604" y="170">fare = 2.76 + 1.35 x miles</text>
+        <text class="b7dL" x="604" y="188">+ 0.43 x minutes; r2 0.883</text>
+
+        <text class="b7dN" x="30" y="232">Same model form in both lanes: a linear regression of fare on miles and minutes.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow result is the only number on this page that came from a real training run</figcaption>
+    </figure>
+
+    <div class="callout tip">
+      <p><strong>What runs where.</strong> Runs in the BigQuery sandbox: no card, no billing account. That holds for the plain <code>SELECT</code> in step 1. Steps 2 and 3 are labelled "needs a billing-enabled project, confirm in your own console": whether the sandbox accepts <code>CREATE MODEL</code> is not documented as of 3 November 2026, so try them in your sandbox, and if they are refused, run them on a billing-enabled project. Replace <code>YOUR_PROJECT</code> with your project id and create a <code>tw_lab</code> dataset first, as in session 3.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>Look at the training rows before you train on them.</strong> This is the <code>AS SELECT</code> of step 2 with the model removed: January 2019, positive and plausible miles and fares. Dry-run it first, as in session 2, and read the bytes estimate; then run it and look at the averages. No output is pasted; your numbers are your own.</p>
+        <div class="prompt-box good"><span class="label">★ Step 1 · sandbox SQL (expected, your numbers will differ)</span>SELECT COUNT(*) AS trips,
+       AVG(trip_miles) AS avg_miles,
+       AVG(trip_seconds / 60) AS avg_minutes,
+       AVG(fare) AS avg_fare
+FROM `bigquery-public-data.chicago_taxi_trips.taxi_trips`
+WHERE trip_start_timestamp &gt;= TIMESTAMP '2019-01-01'
+  AND trip_start_timestamp &lt; TIMESTAMP '2019-02-01'
+  AND trip_miles &gt; 0 AND trip_miles &lt; 50
+  AND fare &gt; 0 AND fare &lt; 200;</div>
+      </div>
+      <div class="step">
+        <p><strong>Train the model.</strong> <code>LINEAR_REG</code> is a built-in model type, so on demand this is the statement priced at the training rate from Part 1, on the bytes its query processes. <code>input_label_cols</code> names the label; <code>trip_miles</code> and <code>trip_minutes</code> become the features.</p>
+        <div class="prompt-box good"><span class="label">★ Step 2 · needs a billing-enabled project, confirm in your own console</span>CREATE OR REPLACE MODEL `YOUR_PROJECT.tw_lab.fare_model`
+OPTIONS (model_type='LINEAR_REG', input_label_cols=['fare']) AS
+SELECT trip_miles,
+       trip_seconds / 60 AS trip_minutes,
+       fare
+FROM `bigquery-public-data.chicago_taxi_trips.taxi_trips`
+WHERE trip_start_timestamp &gt;= TIMESTAMP '2019-01-01'
+  AND trip_start_timestamp &lt; TIMESTAMP '2019-02-01'
+  AND trip_miles &gt; 0 AND trip_miles &lt; 50
+  AND fare &gt; 0 AND fare &lt; 200;</div>
+      </div>
+      <div class="step">
+        <p><strong>Evaluate it, then use it.</strong> Both are charged like ordinary queries. Compare the metrics the evaluation returns with the laptop numbers in step 7; expect them to differ, because the data, the month and the filters differ.</p>
+        <div class="prompt-box good"><span class="label">★ Step 3 · needs a billing-enabled project, confirm in your own console</span>SELECT * FROM ML.EVALUATE(MODEL `YOUR_PROJECT.tw_lab.fare_model`);
+
+SELECT *
+FROM ML.PREDICT(MODEL `YOUR_PROJECT.tw_lab.fare_model`,
+                (SELECT 5.0 AS trip_miles, 15.0 AS trip_minutes));</div>
+      </div>
+      <div class="step">
+        <p><strong>Now the laptop lane. Reuse the environment from builder session 1.</strong> It already has pyarrow 25.0.1 and numpy 2.4.6. The script also calls <code>to_pandas()</code>, so it needs pandas; the pandas version on the build laptop was not recorded, so it is left unpinned here.</p>
+        <div class="prompt-box good"><span class="label">★ Step 4 · setup (verified 3 November 2026, the session 1 environment)</span>. .venv/bin/activate
+pip install pyarrow==25.0.1 numpy==2.4.6 pandas</div>
+      </div>
+      <div class="step">
+        <p><strong>Load and clean the sample.</strong> Three columns, rows with gaps dropped, and range filters close to the SQL's, plus one the SQL does not have: trips between one minute and three hours.</p>
+        <div class="prompt-box good"><span class="label">★ Step 5 · b7_local_model.py, part 1</span># Builder session 7: the model BigQuery ML would train, fitted on a laptop with numpy least squares.
+# This is NOT BigQuery ML; it is the same idea (linear regression on fare) so you can read the SQL.
+# Needs: pip install pyarrow==25.0.1 numpy (numpy 2.4.6 here)
+import sys
+import numpy as np, pyarrow.parquet as pq
+SRC = sys.argv[1] if len(sys.argv) &gt; 1 else "chicago_taxi_sample.parquet"
+t = pq.read_table(SRC, columns=["trip_miles", "trip_seconds", "fare"]).to_pandas().dropna()
+t = t[(t.trip_miles &gt; 0) &amp; (t.trip_miles &lt; 50) &amp; (t.trip_seconds &gt; 60) &amp; (t.trip_seconds &lt; 3 * 3600) &amp; (t.fare &gt; 0) &amp; (t.fare &lt; 200)]</div>
+      </div>
+      <div class="step">
+        <p><strong>Hold out a fifth, fit, evaluate.</strong> A seeded random 20% is kept back for evaluation, the role <code>ML.EVALUATE</code> plays. <code>lstsq</code> fits an intercept and one weight per feature, which is what <code>LINEAR_REG</code> estimates too.</p>
+        <div class="prompt-box good"><span class="label">★ Step 6 · b7_local_model.py, part 2</span>rng = np.random.default_rng(42)
+test = rng.random(len(t)) &lt; 0.2
+X = np.column_stack([np.ones(len(t)), t.trip_miles, t.trip_seconds / 60])
+y = t.fare.to_numpy()
+w, *_ = np.linalg.lstsq(X[~test], y[~test], rcond=None)
+pred = X[test] @ w
+r2 = 1 - ((y[test] - pred) ** 2).sum() / ((y[test] - y[test].mean()) ** 2).sum()
+mae = np.abs(y[test] - pred).mean()
+print(f"training rows {int((~test).sum())}, evaluation rows {int(test.sum())}")
+print(f"fare = {w[0]:.2f} + {w[1]:.2f} x miles + {w[2]:.2f} x minutes")
+print(f"evaluation: r2 {r2:.3f}, mean absolute error ${mae:.2f}")</div>
+      </div>
+      <div class="step">
+        <p><strong>Run it and compare with this real output.</strong> Read the model as a fare card: about $2.76 to start, about $1.35 a mile, about $0.43 a minute, fitted on 11,896 of the 18,362 sampled trips (the ones that pass the sanity filters, minus the 20% held back), across 2013 to 2023, not on the city's whole history. An r2 of 0.883 means the two features explain most of the variation in fare on the held-out trips; the typical miss is $2.31.</p>
+        <div class="prompt-box good"><span class="label">★ Step 7 · python b7_local_model.py (real output, not BigQuery ML)</span>training rows 11896, evaluation rows 2995
+fare = 2.76 + 1.35 x miles + 0.43 x minutes
+evaluation: r2 0.883, mean absolute error $2.31</div>
+      </div>
+    </div>
+
+    <div class="prompt-box bad"><span class="label">✗ The model that was graded on its own homework</span>CREATE OR REPLACE MODEL ... AS SELECT * FROM `...taxi_trips`;   -- every column, every year
+-- then judged by predicting the same rows it trained on, and the bill read afterwards</div>
+  </section>
+
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 8</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li><strong>Settle the sandbox question for yourself.</strong> Run step 2 in your sandbox. Write down the date, what happened, and the exact message if it was refused. That note is worth more than any rule you read.</li>
+      <li><strong>Drop a feature.</strong> In the laptop script, fit fare on miles only. How much do r2 and the mean absolute error move? What does that tell you about minutes?</li>
+      <li><strong>Price the training query.</strong> Dry-run step 1 and note the bytes. Using the Part 1 rates, what would step 2 cost on demand, and what would step 3 cost? Re-verify the rates on the pricing page first.</li>
+      <li><strong>Translate a runbook.</strong> Find one internal document or tutorial that says "Vertex AI". Rewrite its component names with the Agent Platform names from Part 3, keeping the old name in brackets.</li>
+    </ol>
+  </section>
+
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+    <p>Clear all three and builder session 7 gets stamped in your passport.</p>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">1 · On demand, what does BigQuery charge for training a built-in model such as <code>LINEAR_REG</code>?</p>
+      <button class="qopt" type="button">A · Nothing; training is always free</button>
+      <button class="qopt" type="button">B · $6.25 per TiB, the same as any query</button>
+      <button class="qopt" type="button">C · "$312.50 / 1 tebibyte" on the pricing page's built-in model creation row (us-central1, 3 November 2026; re-verify)</button>
+      <button class="qopt" type="button">D · A flat monthly fee per model</button>
+      <p class="qwhy">Evaluation and prediction "incur the same charges as on-demand query jobs", $6.25 per TiB. Training is priced separately: "you must calculate CREATE MODEL job costs independently".</p>
+    </div>
+
+    <div class="quiz-q" data-answer="3">
+      <p class="qtext">2 · Does Google document whether <code>CREATE MODEL</code> runs in the BigQuery sandbox?</p>
+      <button class="qopt" type="button">A · Yes, the sandbox page lists BigQuery ML as supported</button>
+      <button class="qopt" type="button">B · Yes, the sandbox page lists BigQuery ML as unsupported</button>
+      <button class="qopt" type="button">C · Yes, the pricing page says it is free in the sandbox</button>
+      <button class="qopt" type="button">D · No: as of 3 November 2026 neither the sandbox page nor the pricing page says either way, so you test it in your own console and record the date</button>
+      <p class="qwhy">The sandbox page's unsupported list is streaming, DML and the Data Transfer Service; BigQuery ML is not mentioned. An absent sentence is not a rule, so the answer comes from your console, not from these pages.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">3 · Your notes say "deploy on Vertex AI Endpoints". What is the product called now?</p>
+      <button class="qopt" type="button">A · Cloud Run functions</button>
+      <button class="qopt" type="button">B · Agent Platform Endpoints, part of Gemini Enterprise Agent Platform, the name for Vertex AI since 22 April 2026</button>
+      <button class="qopt" type="button">C · BigQuery ML Endpoints</button>
+      <button class="qopt" type="button">D · Model Garden Endpoints</button>
+      <p class="qwhy">The release notes rename nearly every component, Vertex AI Endpoints to Agent Platform Endpoints among them. Model Garden is the one that kept its name.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What this session teaches, and where it came from</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">CREATE MODEL forms, OPTIONS, MODEL_TYPE list</span><span class="note">BigQuery ML, The CREATE MODEL statement, read at source on 3 November 2026</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">ML.EVALUATE and ML.PREDICT</span><span class="note">BigQuery ML function pages, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">BigQuery ML pricing, editions access, the 50-iteration stop</span><span class="note">BigQuery pricing page, BigQuery ML section, read at source from raw HTML; the $312.50 row mapping should be confirmed visually</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Standard edition: no access to BigQuery ML</span><span class="note">Understand BigQuery editions, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Sandbox limits; BigQuery ML not mentioned on the sandbox or pricing page</span><span class="note">Try BigQuery using the sandbox, read at source; the absence is recorded, not interpreted</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Vertex AI renamed Gemini Enterprise Agent Platform, and the component name pairs</span><span class="note">Agent Platform release notes, 22 April 2026, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Model Garden, Workbench, Pipelines, Model Registry; Claude via Model Garden</span><span class="note">Model Garden overview, Workbench and Pipelines introductions, Claude on Google Cloud, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Spend caps cover Agent Platform, not BigQuery</span><span class="note">Manage spend cap budgets, read at source; launch stage reported</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">The laptop model</span><span class="note">Real run on 3 November 2026, numpy 2.4.6, pyarrow 25.0.1, on the shipped 18,362-trip sample; not BigQuery ML</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">The BigQuery ML SQL in the build-along</span><span class="note">Shown, not run: no billing-enabled project on the build laptop</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Tidewater stories</span><span class="note">Constructed</span></div>
+    </div>
+    <p class="mono" style="margin-top:14px">Every fact on this page, and its verification tier, is recorded in the course's source map.</p>
+  </section>
+
+  <section class="cheat" id="cheatsheet">
+    <h3>Builder session 7 cheat sheet <span>· pin this</span></h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>Three statements</b><span><code>CREATE MODEL</code> trains, <code>ML.EVALUATE</code> scores, <code>ML.PREDICT</code> predicts. The rows stay in BigQuery.</span></div>
+      <div class="cheat-item"><b>Training price</b><span>Built-in models on demand: $312.50 per TiB. Evaluate and predict: $6.25 per TiB, like a query. Re-verify.</span></div>
+      <div class="cheat-item"><b>Editions</b><span>Enterprise and Enterprise Plus have BigQuery ML. Standard has none.</span></div>
+      <div class="cheat-item"><b>Sandbox</b><span>Not documented either way. Try it, record the date, use billing if refused.</span></div>
+      <div class="cheat-item"><b>Renamed</b><span>Vertex AI is now Gemini Enterprise Agent Platform. Model Garden kept its name.</span></div>
+      <div class="cheat-item"><b>Spend caps</b><span>Cover Agent Platform and Cloud Run, one project and one service. Not BigQuery.</span></div>
+    </div>
+  </section>
+
+  <div class="callout next">
+    <span class="nx-pill">Next session</span>
+    <p>Everything comes together on one bench. Session 8 runs Tidewater's IAM resolver and the BigQuery cost meter in your browser: 27 access cases checked against the documented rules, and the same taxi query priced from <code>SELECT *</code> down to a clustered, partitioned read.</p>
+  </div>
+
+  <footer class="pagefoot">
+    <span>Builder session 7 of 8 · learn-gcp-with-phoebe · by Phoebe Fu &nbsp;·&nbsp; 📚 <a href="https://phoebefu6.github.io/learn-with-phoebe/">Learn with Phoebe ↗</a></span>
+    <span><a href="b6-cloud-run-or-a-function.html">← Prev: Cloud Run or a function</a> &nbsp;·&nbsp; <a href="b8-the-gcp-iam-and-cost-bench.html">Next: The GCP IAM and cost bench →</a></span>
+  </footer>
+
+</main>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

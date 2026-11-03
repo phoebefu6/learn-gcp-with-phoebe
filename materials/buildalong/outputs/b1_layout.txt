@@ -1,0 +1,6 @@
+rows 18362 columns 23
+tw-lake/flat/trips.csv              7,738,082 bytes
+tw-lake/flat/trips.parquet          1,993,776 bytes
+partition files 11 first tw-lake/sales_raw/taxi/year=2013/part-0.parquet last tw-lake/sales_raw/taxi/year=2023/part-0.parquet
+files read for year = 2019: 1 of 11
+rows in 2019: 1800

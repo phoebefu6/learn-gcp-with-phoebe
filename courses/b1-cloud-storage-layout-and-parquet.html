@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Builder session 1 of 8. Lay out a lake the way Cloud Storage and BigQuery expect it: buckets, location types, storage classes and lifecycle rules, hive-style partition folders and Parquet, built on a laptop from 18,362 real Chicago taxi trips.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="Cloud Storage layout and Parquet - learn gcp with phoebe">
+<meta property="og:description" content="Builder session 1 of 8. The same 18,362 trips are 7.7 MB as CSV and 2.0 MB as Parquet, and a filter on year=2019 opens 1 of 11 files.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/courses/b1-cloud-storage-layout-and-parquet.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Cloud Storage layout and Parquet - learn gcp with phoebe">
+<meta name="twitter:description" content="Builder session 1 of 8. Buckets, classes, lifecycle, hive partitions and Parquet, on a laptop.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Builder session 1 · Cloud Storage layout and Parquet - learn gcp with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=2">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-gcp-with-phoebe</a> / Builder session 1 of 8</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn GCP with Phoebe · Builder track · Session 1 of 8</div>
+    <h1>Cloud Storage layout and <span class="accent">Parquet</span></h1>
+    <p class="sub">Every later decision in a Google Cloud data platform, what a query costs, who can read what, how a pipeline finds new files, depends on how the files were laid out on day one. Tonight you lay out a small lake on your laptop exactly the way Cloud Storage and BigQuery expect it: a bucket in the right location and class, lifecycle rules that move data down the price ladder, hive-style partition folders, and Parquet instead of CSV. The data is 18,362 real Chicago taxi trips.</p>
+    <div class="chip-row">
+      <span class="chip level">🟢 Foundations</span>
+      <span class="chip audience">Data engineers, analytics engineers, analysts who code</span>
+      <span class="chip audience">Python on a laptop, no account</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:4">3-18 · Buckets, classes, lifecycle, layout</span>
+      <span class="a3" style="flex:5">18-40 · Build-along: a partitioned lake on your laptop</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where we start</h2>
+    </div>
+    <p class="lede">The builder track runs on two free things: the BigQuery sandbox, which needs a Google account and no card, and your own laptop. Anything that needs a billing-enabled project, a real bucket, a Dataflow job, a Cloud Run deploy, is shown in boxes that say so, with the command you would run. Every output pasted on these pages came from a real run of the code above it, with the versions named. The sample is the same one the bench in session 8 measures: 18,362 trips from the City of Chicago's Taxi Trips (2013-2023), which BigQuery also hosts as the public table <code>bigquery-public-data.chicago_taxi_trips.taxi_trips</code>.</p>
+
+    <div class="legend">
+      <span class="pill">🎫 Clear all three quiz questions to stamp your passport</span>
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">★ Build-along = you make the artifact</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> A folder on your laptop laid out exactly like a Cloud Storage landing zone, <code>sales_raw/taxi/year=2019/part-0.parquet</code> and ten siblings, plus the measured proof of why: the same 18,362 trips are 7,738,082 bytes as CSV and 1,993,776 bytes as Parquet, and a filter on the year opens 1 of 11 files.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers buckets, location types and storage classes</span>
+      <h2>A bucket is a location and a price ladder</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">A Cloud Storage bucket holds objects, files with a name, and the bucket decides two things for every object in it: where it lives and, by default, which storage class it is billed as. Location types are a region ("a specific geographic place, such as Iowa"), a dual-region ("a specific pair of regions") or a multi-region ("a large geographic area that contains two or more geographic regions"). Classes trade a lower storage price for a minimum storage duration and a retrieval fee.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A staircase of four storage classes going down left to right: Standard with no minimum duration and no retrieval fee; Nearline with a 30-day minimum, ideal for data read about once a month; Coldline with a 90-day minimum, about once a quarter; Archive with a 365-day minimum, less than once a year. A lifecycle rule is drawn as an arrow carrying an object down the stairs by age: after 30 days to Nearline, after 90 to Coldline, after 365 to Archive, and finally Delete.">
+        <defs>
+          <filter id="b1aSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="13" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b1aHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="b1aAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b1aH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b1aL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b1aS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b1aA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b1aN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="b1aH" x="30" y="26">FOUR CLASSES, ONE LIFECYCLE RULE CARRYING AN OBJECT DOWN THEM BY AGE</text>
+
+        <g filter="url(#b1aSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="56" width="190" height="64" rx="8" transform="rotate(-0.5 125 88)" fill="#FFFFFF"/>
+          <rect x="230" y="116" width="190" height="64" rx="8" transform="rotate(0.5 325 148)" fill="#E8F0FE"/>
+          <rect x="430" y="176" width="190" height="64" rx="8" transform="rotate(-0.4 525 208)" fill="#E8F0FE"/>
+          <rect x="630" y="236" width="220" height="64" rx="8" transform="rotate(0.4 740 268)" fill="url(#b1aHc)"/>
+          <path d="M200 70 C 260 60, 300 80, 300 108" marker-end="url(#b1aAr)" stroke="#1A73E8"/>
+          <path d="M400 130 C 460 120, 500 140, 500 168" marker-end="url(#b1aAr)" stroke="#1A73E8"/>
+          <path d="M600 190 C 660 180, 700 200, 700 228" marker-end="url(#b1aAr)" stroke="#1A73E8"/>
+          <rect x="690" y="50" width="160" height="34" rx="8" transform="rotate(1 770 67)" fill="#FBBC04"/>
+        </g>
+
+        <text class="b1aL" x="46" y="82">Standard</text>
+        <text class="b1aS" x="46" y="100">no minimum, no retrieval fee</text>
+        <text class="b1aL" x="246" y="142">Nearline</text>
+        <text class="b1aS" x="246" y="160">30-day minimum, about monthly</text>
+        <text class="b1aL" x="446" y="202">Coldline</text>
+        <text class="b1aS" x="446" y="220">90-day minimum, about quarterly</text>
+        <text class="b1aL" x="646" y="262">Archive</text>
+        <text class="b1aS" x="646" y="280">365-day minimum, under once a year</text>
+        <text class="b1aA" x="226" y="58">age 30</text>
+        <text class="b1aA" x="426" y="118">age 90</text>
+        <text class="b1aA" x="626" y="178">age 365</text>
+        <text class="b1aL" x="704" y="72">lifecycle rule: age</text>
+
+        <text class="b1aN" x="30" y="318">Cheaper to keep, dearer to read: classes below Standard add a minimum duration and a retrieval fee.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow tag is the rule; each rule does exactly one thing, so four steps take four rules</figcaption>
+    </figure>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>Pick the class by how often the data is read<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Google's own guidance is in reading frequency. Nearline is "ideal for data you plan to read or modify on average once per month or less", Coldline "at most once a quarter", Archive for "data that you plan to access less than once a year". Standard has no minimum storage duration and no retrieval fee; Nearline has a 30-day minimum, Coldline 90 and Archive 365, and all three charge to read. For a data team that maps neatly onto zones: the landing zone and anything BigQuery reads every day stay Standard, last year's raw drops can go colder, and audit copies go to Archive.</p>
+        <p>If you cannot predict the reading pattern, Google offers Autoclass: "let Cloud Storage manage storage class transitions for you automatically". It is a sensible default for a bucket nobody owns the access pattern of yet.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Uniform bucket-level access, and why it is a one-way door<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>With uniform bucket-level access, "Access Control Lists (ACLs) are disabled, and only bucket-level" IAM permissions grant access. Google says that "Generally, using uniform bucket-level access is recommended", and also that it "cannot be disabled after it has been active on a bucket for 90 consecutive days". It matters beyond tidiness: IAM Conditions on a bucket's allow policy need it switched on, and an organization can enforce it everywhere with the constraint <code>storage.uniformBucketLevelAccess</code>. Session 4 builds the IAM on top of it.</p>
+      </div>
+    </details>
+  </section>
+
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers lifecycle rules and object naming</span>
+      <h2>Names are the layout, rules are the schedule</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">Cloud Storage has no folders, only object names with slashes in them, and every tool that reads a lake treats those names as the layout. BigQuery reads a hive-style layout directly: Google's own example is <code>gs://my_bucket/my_table/dt=2019-10-31/lang=en/my_filename</code>, where each <code>key=value</code> segment becomes a partition column. Lifecycle rules then act on those names and ages: "A lifecycle rule specifies exactly one of the following actions": Delete, SetStorageClass, or AbortIncompleteMultipartUpload.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two object listings side by side for the constructed Tidewater landing bucket. On the left, the wrong way: files named export_final.csv, export_final (1).csv and a timestamped JSON file per minute, all in one prefix, so a query for one day must open everything. On the right, the hive way: sales/dt=2026-10-31/part-0.parquet, sales/dt=2026-11-01/part-0.parquet, sales/dt=2026-11-02/part-0.parquet. A filter dt equals 2026-11-01 is drawn as a finger touching only the middle file. Below, a lifecycle rule with condition matchesPrefix sales/ and age 90 and action SetStorageClass COLDLINE.">
+        <defs>
+          <filter id="b1bSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="17" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <marker id="b1bAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b1bH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b1bL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b1bS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b1bR { font: 800 11px Inter, sans-serif; fill: #991B1B; }
+          .b1bA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b1bN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#b1bSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="40" width="380" height="150" rx="10" transform="rotate(-0.4 220 115)" fill="#FEF2F2" stroke="#991B1B"/>
+          <rect x="460" y="40" width="390" height="150" rx="10" transform="rotate(0.4 655 115)" fill="#FFFFFF"/>
+          <rect x="476" y="102" width="358" height="26" rx="5" fill="#FBBC04"/>
+          <rect x="30" y="214" width="820" height="56" rx="10" transform="rotate(0.2 440 242)" fill="#E8F0FE"/>
+        </g>
+
+        <text class="b1bR" x="46" y="62">ONE PREFIX, NO KEYS</text>
+        <text class="b1bS" x="46" y="88">gs://tw-landing/export_final.csv</text>
+        <text class="b1bS" x="46" y="110">gs://tw-landing/export_final (1).csv</text>
+        <text class="b1bS" x="46" y="132">gs://tw-landing/ingest_2026-11-01-0931.json</text>
+        <text class="b1bS" x="46" y="154">... one file a minute, forever</text>
+        <text class="b1bR" x="46" y="176">a one-day question opens every file</text>
+        <text class="b1bA" x="476" y="62">HIVE-STYLE: KEY=VALUE SEGMENTS</text>
+        <text class="b1bS" x="490" y="90">sales/dt=2026-10-31/part-0.parquet</text>
+        <text class="b1bL" x="490" y="120">sales/dt=2026-11-01/part-0.parquet</text>
+        <text class="b1bS" x="490" y="150">sales/dt=2026-11-02/part-0.parquet</text>
+        <text class="b1bA" x="476" y="176">WHERE dt = '2026-11-01' opens one folder</text>
+        <text class="b1bL" x="46" y="238">Lifecycle rule:</text>
+        <text class="b1bS" x="150" y="238">condition matchesPrefix "sales/" and age 90</text>
+        <text class="b1bL" x="46" y="258">Action:</text>
+        <text class="b1bS" x="150" y="258">SetStorageClass COLDLINE (one action per rule)</text>
+
+        <text class="b1bN" x="30" y="290">Bucket and object names are constructed for Tidewater; the dt= format is Google's documented hive layout.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the red panel is the layout that sets every future query's price by accident</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Three naming rules that save every later session<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>Put the partition key in the name as <code>key=value</code>.</strong> BigQuery can then detect it: with source format AUTO "Key names and types are automatically detected", and with <code>requirePartitionFilter</code> a query without a filter on the key fails instead of reading everything. <strong>Prefix by zone and table first</strong> (<code>sales/</code>, <code>loyalty/</code>), so lifecycle rules can target one table with <code>matchesPrefix</code>, and IAM Conditions can target it with <code>resource.name.startsWith</code>. <strong>Write fewer, larger files</strong> than one per minute: every file is an object to list and open, and a reader pays that overhead per file.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Lifecycle conditions worth knowing<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Rules can combine conditions: <code>age</code>, <code>createdBefore</code>, <code>matchesPrefix</code> and <code>matchesSuffix</code>, <code>matchesStorageClass</code>, <code>numNewerVersions</code> and <code>daysSinceNoncurrentTime</code> for versioned buckets, <code>sizeAboveBytes</code> and others. Google caps the prefixes and suffixes at "up to 1000 prefixes and suffixes in total specified across all rules". A useful pair for a landing zone: SetStorageClass to Coldline at age 90 for <code>sales/</code>, and Delete at age 30 for <code>tmp/</code>. A rule applies to every object it matches, including objects already in the bucket, so read it twice before saving it on a production bucket.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The landing bucket that became the archive.</strong> A team points every source system at one bucket with default names. Two years later the bucket holds millions of small files, nobody can say which are still read, and no lifecycle rule can be written safely because the names carry no zone and no date. The fix is a rename, which on object storage means a full copy. The story is a constructed composite; the remedy, keys in names from day one, costs nothing at the start.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-3">
+    <div class="section-kicker">
+      <span class="klabel">Part 3 · covers Parquet and why BigQuery prefers it</span>
+      <h2>Columns on disk, columns on the bill</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">CSV stores rows: to read one column you read every byte of every line. Parquet stores each column separately, compressed, with a footer that says where each column chunk sits, so a reader fetches only the columns it needs. BigQuery reads Parquet natively from Cloud Storage through external and BigLake tables, and BigQuery's own storage is columnar too: on-demand queries are charged by "the total data processed in the columns you select". The format of the landing zone decides how much every downstream read costs.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The same 18,362 Chicago taxi trips drawn twice. On top, CSV as a long bar of row stripes, 7,738,082 bytes, where reading the fare column means reading every stripe. Below, Parquet as 23 column chunks side by side, 1,993,776 bytes in total, with one chunk, fare, highlighted as the only one a fare query fetches.">
+        <defs>
+          <filter id="b1cSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="19" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b1cHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+        </defs>
+        <style>
+          .b1cH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b1cL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b1cS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b1cV { font: 800 16px Inter, sans-serif; fill: #174EA6; }
+          .b1cN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="b1cH" x="30" y="26">THE SAME 18,362 TRIPS, TWO FORMATS (MEASURED IN THE BUILD-ALONG)</text>
+
+        <g filter="url(#b1cSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="44" width="700" height="60" rx="6" fill="url(#b1cHc)"/>
+          <path d="M30 59 L730 59 M30 74 L730 74 M30 89 L730 89" stroke="#1A73E8"/>
+          <rect x="30" y="150" width="56" height="60" rx="6" fill="url(#b1cHc)"/>
+          <path d="M45 150 L45 210 M60 150 L60 210 M75 150 L75 210 M138 150 L138 210 M153 150 L153 210 M168 150 L168 210 M183 150 L183 210 M198 150 L198 210" stroke="#1A73E8"/>
+          <rect x="90" y="146" width="30" height="68" rx="3" fill="#FBBC04"/>
+          <rect x="124" y="150" width="86" height="60" rx="6" fill="url(#b1cHc)"/>
+        </g>
+
+        <text class="b1cL" x="30" y="124">CSV, row after row: a fare question reads every byte</text>
+        <text class="b1cV" x="748" y="80">7,738,082 B</text>
+        <text class="b1cL" x="30" y="232">Parquet, one chunk per column, compressed: a fare question fetches one chunk and the footer</text>
+        <text class="b1cV" x="230" y="186">1,993,776 B</text>
+        <text class="b1cS" x="380" y="186">snappy compression, written by pyarrow 25.0.1</text>
+
+        <text class="b1cN" x="30" y="266">Parquet is 25.8% of the CSV here before any column is skipped; skipping columns is where the larger saving comes from.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow chunk is the only part of the file a one-column question has to fetch</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Two different savings, and which one BigQuery bills<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The file shrinks from 7,738,082 to 1,993,776 bytes, 25.8%, because Parquet stores types and compresses each column. That saves storage and network. The second saving is per query: a reader that needs one column fetches one chunk. Be precise about which one shows on a BigQuery bill. For tables stored in BigQuery, on-demand charges use BigQuery's documented logical sizes, 8 bytes per number, 2 plus the text length per string, not the compressed size on disk. So for native tables the lever is the columns and partitions you read, which session 3 measures; for external tables over Parquet, the file layout is what the engine has to open.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>External table or BigLake table over these files<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Both let BigQuery query files in Cloud Storage. An external table needs the reader to have access to the bucket as well. A BigLake table uses access delegation: "you grant users access only to the BigLake table, not to the underlying datastore", and it supports Avro, CSV, Delta Lake, Iceberg, JSON, ORC and Parquet. For a lake that more than one team reads, BigLake keeps one gate instead of two. Session 2 in the leader track, BigQuery is the warehouse and the lake, draws the difference.</p>
+      </div>
+    </details>
+  </section>
+
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>A partitioned lake on your laptop</h2>
+      <span class="tag demo">★ 22 min · everyone builds</span>
+    </div>
+    <p class="lede">Four steps, one Python file, a few seconds of run time. The output at the end is pasted from a real run of exactly this code. Work in a fresh, empty folder; the later builder sessions reuse the sample file you download here.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The build-along drawn left to right. The sample Parquet file of 18,362 trips goes into pyarrow, which writes a flat CSV and a flat Parquet file, and a partitioned folder tw-lake/sales_raw/taxi with eleven year= folders. A final step asks for year 2019 and opens one folder of eleven.">
+        <defs>
+          <filter id="b1dSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="43" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b1dHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="b1dAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b1dL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b1dS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b1dW { font: 800 12px Inter, sans-serif; fill: #FFFFFF; }
+          .b1dN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#b1dSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="60" width="160" height="70" rx="8" transform="rotate(-1 110 95)" fill="url(#b1dHc)"/>
+          <rect x="230" y="60" width="110" height="70" rx="8" transform="rotate(0.8 285 95)" fill="#174EA6" stroke="#174EA6"/>
+          <rect x="380" y="30" width="190" height="36" rx="6" fill="#FFFFFF"/>
+          <rect x="380" y="78" width="190" height="36" rx="6" fill="#FFFFFF"/>
+          <rect x="380" y="126" width="190" height="36" rx="6" fill="#E8F0FE"/>
+          <rect x="620" y="110" width="230" height="56" rx="10" transform="rotate(0.5 735 138)" fill="#FBBC04"/>
+          <path d="M194 95 L222 95" marker-end="url(#b1dAr)"/>
+          <path d="M344 88 L372 50 M344 95 L372 96 M344 102 L372 142" marker-end="url(#b1dAr)"/>
+          <path d="M574 144 L612 140" marker-end="url(#b1dAr)"/>
+        </g>
+
+        <text class="b1dL" x="44" y="90">sample.parquet</text>
+        <text class="b1dS" x="44" y="108">18,362 trips</text>
+        <text class="b1dW" x="246" y="92">pyarrow</text>
+        <text class="b1dW" x="246" y="110">writes</text>
+        <text class="b1dL" x="392" y="53">flat/trips.csv</text>
+        <text class="b1dL" x="392" y="101">flat/trips.parquet</text>
+        <text class="b1dL" x="392" y="149">sales_raw/taxi/year=*</text>
+        <text class="b1dL" x="636" y="134">filter year = 2019</text>
+        <text class="b1dL" x="636" y="154">opens 1 of 11 folders</text>
+
+        <text class="b1dN" x="30" y="200">Same rows in, two flat files and one partitioned folder out. Every number below is printed by this script.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - <code>tw-lake/</code> stands in for <code>gs://tw-lake-prod-landing</code>; the names are exactly what you would upload</figcaption>
+    </figure>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>Create an environment with the versions this page was verified on, and download the sample.</strong> The sample is 1,198,556 bytes: 18,362 trips from 132 seeded 15-minute slots, one per month from 2013 to 2023, with BigQuery's column names and types. Run in a new, empty folder.</p>
+        <div class="prompt-box good"><span class="label">★ Step 1 · setup (verified 3 November 2026, Python 3.11)</span>python3 -m venv .venv &amp;&amp; . .venv/bin/activate
+pip install pyarrow==25.0.1 duckdb==2.0.0 numpy==2.4.6
+curl -O https://phoebefu6.github.io/learn-gcp-with-phoebe/data/chicago_taxi_sample.parquet</div>
+      </div>
+      <div class="step">
+        <p><strong>Write the same rows as CSV and as Parquet, and measure both.</strong> <code>tw-lake</code> is a local folder playing the landing bucket.</p>
+        <div class="prompt-box good"><span class="label">★ Step 2 · b1_layout.py, part 1</span>import os, sys, glob, shutil
+import pyarrow.parquet as pq, pyarrow.csv as pacsv, pyarrow.compute as pc, pyarrow.dataset as ds
+
+SRC = sys.argv[1] if len(sys.argv) &gt; 1 else "chicago_taxi_sample.parquet"
+LAKE = "tw-lake"                      # stands in for gs://tw-lake-prod-landing
+shutil.rmtree(LAKE, ignore_errors=True)
+t = pq.read_table(SRC)
+print("rows", t.num_rows, "columns", t.num_columns)
+
+os.makedirs(f"{LAKE}/flat", exist_ok=True)
+pacsv.write_csv(t, f"{LAKE}/flat/trips.csv")
+pq.write_table(t, f"{LAKE}/flat/trips.parquet", compression="snappy")
+for f in sorted(glob.glob(f"{LAKE}/flat/*")):
+    print(f"{f:32s} {os.path.getsize(f):&gt;12,d} bytes")</div>
+      </div>
+      <div class="step">
+        <p><strong>Write hive-style partitions by year, then ask for one year.</strong> <code>write_to_dataset</code> turns the <code>year</code> column into <code>year=YYYY</code> folders, the format BigQuery external tables detect. The dataset reader then prunes folders by the filter before opening any file.</p>
+        <div class="prompt-box good"><span class="label">★ Step 3 · b1_layout.py, part 2</span>t = t.append_column("year", pc.year(t["trip_start_timestamp"]))
+pq.write_to_dataset(t, f"{LAKE}/sales_raw/taxi", partition_cols=["year"],
+                    basename_template="part-{i}.parquet")
+parts = sorted(glob.glob(f"{LAKE}/sales_raw/taxi/year=*/*.parquet"))
+print("partition files", len(parts), "first", parts[0], "last", parts[-1])
+
+d = ds.dataset(f"{LAKE}/sales_raw/taxi", format="parquet", partitioning="hive")
+frags = list(d.get_fragments(filter=ds.field("year") == 2019))
+print("files read for year = 2019:", len(frags), "of", len(parts))
+print("rows in 2019:", d.to_table(filter=ds.field("year") == 2019).num_rows)</div>
+      </div>
+      <div class="step">
+        <p><strong>Run it and compare with this real output.</strong> Byte counts match exactly with pyarrow 25.0.1; another version may encode slightly differently. The 1,800 rows in 2019 are twelve 15-minute slots of 150 trips each, not a year of Chicago taxis.</p>
+        <div class="prompt-box good"><span class="label">★ Step 4 · python b1_layout.py (real output)</span>rows 18362 columns 23
+tw-lake/flat/trips.csv              7,738,082 bytes
+tw-lake/flat/trips.parquet          1,993,776 bytes
+partition files 11 first tw-lake/sales_raw/taxi/year=2013/part-0.parquet last tw-lake/sales_raw/taxi/year=2023/part-0.parquet
+files read for year = 2019: 1 of 11
+rows in 2019: 1800</div>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <p><strong>On a billing-enabled project (optional).</strong> Shown, needs a billing-enabled project: the BigQuery sandbox covers BigQuery only, and the $300 Free Trial asks for a card. With one, the same layout goes up with three commands from Google's gcloud guide, and a lifecycle rule goes on with a fourth. Cloud Storage's free tier is "5 GB-months of regional storage (US regions only) per month", so a few megabytes in a US region for an evening costs nothing; outside the US regions it is billed at the regional rate. Delete the bucket afterwards with <code>gcloud storage rm gs://BUCKET --recursive</code>.</p>
+    </div>
+    <div class="prompt-box good"><span class="label">★ Shown, needs a billing-enabled project · upload and lifecycle</span>gcloud storage buckets create gs://BUCKET/ --location=asia-southeast1 --uniform-bucket-level-access
+gcloud storage cp --recursive tw-lake/sales_raw gs://BUCKET/
+gcloud storage ls gs://BUCKET/sales_raw/taxi/
+gcloud storage buckets update gs://BUCKET --lifecycle-file=lifecycle.json
+
+# lifecycle.json
+{"rule": [
+  {"action": {"type": "SetStorageClass", "storageClass": "COLDLINE"},
+   "condition": {"age": 90, "matchesPrefix": ["sales_raw/"]}},
+  {"action": {"type": "Delete"},
+   "condition": {"age": 30, "matchesPrefix": ["tmp/"]}}
+]}</div>
+
+    <div class="prompt-box bad"><span class="label">✗ The layout that sets every future query's price by accident</span>gs://tw-landing/export_final.csv
+gs://tw-landing/export_final (1).csv
+gs://tw-landing/ingest_2026-11-01-0931.json   (one file a minute, forever)</div>
+
+    <p class="mono" style="margin-top:14px">Data notice, as the City of Chicago's Terms of Use require: This site provides applications using data that has been modified for use from its original source, www.cityofchicago.org, the official website of the City of Chicago. The City of Chicago makes no claims as to the content, accuracy, timeliness, or completeness of any of the data provided at this site. The data provided at this site is subject to change at any time. It is understood that the data provided at this site is being used at one's own risk.</p>
+  </section>
+
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 2</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li><strong>Partition by month instead.</strong> Add a <code>month</code> column next to <code>year</code> and pass both to <code>partition_cols</code>. Count the folders, then ask for one month. How many files does it open?</li>
+      <li><strong>Write the lifecycle rules for your own landing zone.</strong> Which prefixes go colder, at what age, and which are deleted. Remember each rule holds one action.</li>
+      <li><strong>List one real bucket's names.</strong> If you have access to a bucket at work, run <code>gcloud storage ls</code> on it (or read the console list) and mark which names carry a key and which do not.</li>
+      <li><strong>Open the BigQuery sandbox.</strong> Sign in at the BigQuery console with a Google account and confirm the sandbox banner shows. Session 2 queries the same taxi table at full size there.</li>
+    </ol>
+  </section>
+
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+    <p>Clear all three and builder session 1 gets stamped in your passport.</p>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">1 · Last year's raw drops are read about once a quarter for audits. Which class fits, and what does it add?</p>
+      <button class="qopt" type="button">A · Standard, because it has no minimum</button>
+      <button class="qopt" type="button">B · Archive, because it is cheapest to store</button>
+      <button class="qopt" type="button">C · Coldline: Google's guidance is "at most once a quarter", with a 90-day minimum storage duration and a retrieval fee</button>
+      <button class="qopt" type="button">D · Nearline, because classes do not matter for reads</button>
+      <p class="qwhy">Pick by reading frequency. Archive is for data read less than once a year; Coldline matches quarterly audits and adds a 90-day minimum and a charge to read.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">2 · Why name objects <code>sales/dt=2026-11-01/part-0.parquet</code> instead of <code>export_2026-11-01.csv</code>?</p>
+      <button class="qopt" type="button">A · The <code>key=value</code> segment is the hive layout BigQuery detects as a partition column, so a filter on <code>dt</code> opens one folder, and the <code>sales/</code> prefix lets lifecycle rules and IAM Conditions target the table</button>
+      <button class="qopt" type="button">B · Cloud Storage requires folders</button>
+      <button class="qopt" type="button">C · Longer names are cheaper</button>
+      <button class="qopt" type="button">D · It makes no difference to any reader</button>
+      <p class="qwhy">Object storage has no folders, only names; the names are the layout every reader and rule works from. In the build-along the year= folders let a 2019 filter open 1 of 11 files.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="3">
+      <p class="qtext">3 · The Parquet file is 25.8% of the CSV. Does that cut a BigQuery on-demand bill for a native table by the same share?</p>
+      <button class="qopt" type="button">A · Yes, BigQuery bills compressed bytes</button>
+      <button class="qopt" type="button">B · Yes, but only on Mondays</button>
+      <button class="qopt" type="button">C · No, BigQuery never reads Parquet</button>
+      <button class="qopt" type="button">D · No: native tables are billed on BigQuery's documented logical sizes for the columns read, so the lever there is which columns and partitions a query touches</button>
+      <p class="qwhy">The compression saving is real for storage and for files BigQuery reads externally. For native tables the bill follows logical bytes per column read, which session 3 and the bench measure.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What this session teaches, and where it came from</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Bucket location types: region, dual-region, multi-region</span><span class="note">Cloud Storage bucket locations, read at source on 3 November 2026</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Storage classes, minimum durations, retrieval fees, Autoclass</span><span class="note">Cloud Storage storage classes, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Lifecycle rules: one action per rule, the conditions, the 1,000 prefix cap</span><span class="note">Object Lifecycle Management, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Uniform bucket-level access and the 90-day lock</span><span class="note">Uniform bucket-level access page, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Hive layout example and AUTO key detection</span><span class="note">BigQuery, Manage external Hive partitioned data, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">gcloud storage commands and the free tier</span><span class="note">Discover object storage with the gcloud CLI; free cloud features page, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">The build-along output</span><span class="note">Real run on 3 November 2026, Python 3.11.11, pyarrow 25.0.1, on the shipped 18,362-trip sample</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Tidewater bucket names and the landing-bucket story</span><span class="note">Constructed</span></div>
+    </div>
+    <p class="mono" style="margin-top:14px">Every fact on this page, and its verification tier, is recorded in the course's source map.</p>
+  </section>
+
+  <section class="cheat" id="cheatsheet">
+    <h3>Builder session 1 cheat sheet <span>· pin this</span></h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>Location</b><span>Region, dual-region or multi-region, per bucket. Put it next to the BigQuery dataset that reads it.</span></div>
+      <div class="cheat-item"><b>Classes</b><span>Standard, Nearline 30 days, Coldline 90, Archive 365. Below Standard, reading costs extra.</span></div>
+      <div class="cheat-item"><b>Lifecycle</b><span>One action per rule: Delete, SetStorageClass or AbortIncompleteMultipartUpload.</span></div>
+      <div class="cheat-item"><b>Names</b><span><code>zone/table/key=value/part-N.parquet</code>. The name is the layout.</span></div>
+      <div class="cheat-item"><b>Parquet</b><span>Columns stored apart and compressed: 1,993,776 vs 7,738,082 bytes for the same trips.</span></div>
+      <div class="cheat-item"><b>Uniform access</b><span>IAM only, no ACLs. It locks after 90 days on; turn it on at creation.</span></div>
+    </div>
+  </section>
+
+  <div class="callout next">
+    <span class="nx-pill">Next session</span>
+    <p>The full table, in the cloud, for free. Session 2 opens the BigQuery sandbox, queries the same Chicago taxi trips at their full size of about 212 million rows, reads the bytes a query will process before running it, and sets a ceiling on what any one query may bill.</p>
+  </div>
+
+  <footer class="pagefoot">
+    <span>Builder session 1 of 8 · learn-gcp-with-phoebe · by Phoebe Fu &nbsp;·&nbsp; 📚 <a href="https://phoebefu6.github.io/learn-with-phoebe/">Learn with Phoebe ↗</a></span>
+    <span><a href="../index.html">← Course home</a> &nbsp;·&nbsp; <a href="b2-bigquery-in-the-sandbox.html">Next: BigQuery in the sandbox →</a></span>
+  </footer>
+
+</main>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

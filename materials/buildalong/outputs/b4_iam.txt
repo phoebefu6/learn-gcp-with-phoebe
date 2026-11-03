@@ -1,0 +1,9 @@
+c05 raj@tidewater.example                                bigquery.tables.getData      on t-raw-orders  -> allow       (allow at f-data-platform)
+     trace: deny rule at org: denial condition false
+c06 raj@tidewater.example                                bigquery.tables.updateData   on t-raw-orders  -> deny        (deny at tw-lake-prod)
+c08 ingest-pipeline@tw-lake-prod.iam.gserviceaccount.com bigquery.tables.updateData   on t-raw-orders  -> allow       (allow at tw-lake-prod)
+     trace: deny rule at tw-lake-prod: principal is an exception
+c09 ingest-pipeline@tw-lake-prod.iam.gserviceaccount.com bigquery.tables.updateData   on t-cur-orders  -> not-granted (none at -)
+     trace: deny rule at tw-lake-prod: principal is an exception
+     trace: binding roles/bigquery.dataEditor at tw-lake-prod: condition false
+c12 lin@tidewater.example                                bigquery.tables.getData      on t-pii-members -> deny        (deny at org)

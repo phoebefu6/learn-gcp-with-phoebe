@@ -1,0 +1,7 @@
+$ curl -s -X POST localhost:8080 -H "Content-Type: application/json" -d '{"bucket":"tw-lake-prod-landing","name":"sales/dt=2026-11-01/part-0.parquet"}'
+{"into":"tw-lake-prod.sales_raw.orders$20261101","load":"gs://tw-lake-prod-landing/sales/dt=2026-11-01/part-0.parquet","status":"accepted"}
+
+$ curl -s -X POST localhost:8080 -H "Content-Type: application/json" -d '{"bucket":"tw-lake-prod-landing","name":"sales/2026-11-01.csv"}'
+{"name":"sales/2026-11-01.csv","reason":"path is not sales/dt=YYYY-MM-DD/*.parquet","status":"rejected"}
+
+HTTP 400

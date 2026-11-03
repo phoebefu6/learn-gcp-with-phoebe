@@ -1,0 +1,602 @@
+{
+ "_note": "Tidewater Grocers is a constructed company. Hierarchy, groups, policies and cases are constructed; the rules they test are Google's documented ones (see doc).",
+ "now": "2026-11-03T09:00:00Z",
+ "nodes": [
+  {
+   "id": "org",
+   "type": "organization",
+   "name": "organizations/1001",
+   "label": "tidewater.example (organization 1001)"
+  },
+  {
+   "id": "f-data-platform",
+   "type": "folder",
+   "parent": "org",
+   "name": "folders/2001",
+   "label": "folder data-platform"
+  },
+  {
+   "id": "f-analytics",
+   "type": "folder",
+   "parent": "org",
+   "name": "folders/2002",
+   "label": "folder analytics"
+  },
+  {
+   "id": "f-sandbox",
+   "type": "folder",
+   "parent": "org",
+   "name": "folders/2003",
+   "label": "folder sandbox"
+  },
+  {
+   "id": "tw-lake-prod",
+   "type": "project",
+   "parent": "f-data-platform",
+   "name": "projects/tw-lake-prod",
+   "label": "project tw-lake-prod",
+   "tags": {
+    "1001/env": "prod"
+   }
+  },
+  {
+   "id": "tw-lake-dev",
+   "type": "project",
+   "parent": "f-sandbox",
+   "name": "projects/tw-lake-dev",
+   "label": "project tw-lake-dev",
+   "tags": {
+    "1001/env": "dev"
+   }
+  },
+  {
+   "id": "tw-bi-prod",
+   "type": "project",
+   "parent": "f-analytics",
+   "name": "projects/tw-bi-prod",
+   "label": "project tw-bi-prod",
+   "tags": {
+    "1001/env": "prod"
+   }
+  },
+  {
+   "id": "ds-sales_raw",
+   "type": "dataset",
+   "parent": "tw-lake-prod",
+   "name": "projects/tw-lake-prod/datasets/sales_raw",
+   "label": "dataset sales_raw"
+  },
+  {
+   "id": "ds-sales_curated",
+   "type": "dataset",
+   "parent": "tw-lake-prod",
+   "name": "projects/tw-lake-prod/datasets/sales_curated",
+   "label": "dataset sales_curated"
+  },
+  {
+   "id": "ds-loyalty_pii",
+   "type": "dataset",
+   "parent": "tw-lake-prod",
+   "name": "projects/tw-lake-prod/datasets/loyalty_pii",
+   "label": "dataset loyalty_pii",
+   "tags": {
+    "1001/pii": "true"
+   }
+  },
+  {
+   "id": "ds-dev-sales_curated",
+   "type": "dataset",
+   "parent": "tw-lake-dev",
+   "name": "projects/tw-lake-dev/datasets/sales_curated",
+   "label": "dataset sales_curated (dev)"
+  },
+  {
+   "id": "t-raw-orders",
+   "type": "table",
+   "parent": "ds-sales_raw",
+   "name": "projects/tw-lake-prod/datasets/sales_raw/tables/orders",
+   "label": "table sales_raw.orders"
+  },
+  {
+   "id": "t-cur-orders",
+   "type": "table",
+   "parent": "ds-sales_curated",
+   "name": "projects/tw-lake-prod/datasets/sales_curated/tables/orders",
+   "label": "table sales_curated.orders"
+  },
+  {
+   "id": "t-pii-members",
+   "type": "table",
+   "parent": "ds-loyalty_pii",
+   "name": "projects/tw-lake-prod/datasets/loyalty_pii/tables/members",
+   "label": "table loyalty_pii.members"
+  },
+  {
+   "id": "t-dev-orders",
+   "type": "table",
+   "parent": "ds-dev-sales_curated",
+   "name": "projects/tw-lake-dev/datasets/sales_curated/tables/orders",
+   "label": "table sales_curated.orders (dev)"
+  },
+  {
+   "id": "b-landing",
+   "type": "bucket",
+   "parent": "tw-lake-prod",
+   "name": "projects/_/buckets/tw-lake-prod-landing",
+   "label": "bucket tw-lake-prod-landing"
+  },
+  {
+   "id": "o-landing",
+   "type": "object",
+   "parent": "b-landing",
+   "name": "projects/_/buckets/tw-lake-prod-landing/objects/sales/dt=2026-11-01/part-0.parquet",
+   "label": "object sales/dt=2026-11-01/part-0.parquet"
+  }
+ ],
+ "groups": {
+  "group:analysts@tidewater.example": [
+   "user:mei@tidewater.example"
+  ],
+  "group:data-eng@tidewater.example": [
+   "user:raj@tidewater.example"
+  ],
+  "group:contractors@tidewater.example": [
+   "user:ana@tidewater.example"
+  ],
+  "group:privacy-officers@tidewater.example": [
+   "user:zoe@tidewater.example"
+  ],
+  "group:security@tidewater.example": [
+   "user:sam@tidewater.example"
+  ]
+ },
+ "allow": {
+  "org": [
+   {
+    "role": "roles/viewer",
+    "members": [
+     "group:security@tidewater.example"
+    ]
+   }
+  ],
+  "f-data-platform": [
+   {
+    "role": "roles/bigquery.dataEditor",
+    "members": [
+     "group:data-eng@tidewater.example"
+    ]
+   }
+  ],
+  "f-analytics": [
+   {
+    "role": "roles/bigquery.jobUser",
+    "members": [
+     "group:analysts@tidewater.example"
+    ]
+   }
+  ],
+  "tw-lake-prod": [
+   {
+    "role": "roles/bigquery.dataEditor",
+    "members": [
+     "serviceAccount:ingest-pipeline@tw-lake-prod.iam.gserviceaccount.com"
+    ],
+    "condition": "resource.name.startsWith('projects/tw-lake-prod/datasets/sales_raw')"
+   },
+   {
+    "role": "roles/bigquery.jobUser",
+    "members": [
+     "serviceAccount:ingest-pipeline@tw-lake-prod.iam.gserviceaccount.com"
+    ]
+   }
+  ],
+  "tw-bi-prod": [
+   {
+    "role": "roles/bigquery.user",
+    "members": [
+     "group:analysts@tidewater.example"
+    ]
+   }
+  ],
+  "tw-lake-dev": [
+   {
+    "role": "roles/bigquery.dataEditor",
+    "members": [
+     "group:contractors@tidewater.example"
+    ],
+    "condition": "request.time < timestamp('2026-12-31T00:00:00Z')"
+   }
+  ],
+  "ds-sales_curated": [
+   {
+    "role": "roles/bigquery.dataViewer",
+    "members": [
+     "group:analysts@tidewater.example"
+    ]
+   }
+  ],
+  "ds-loyalty_pii": [
+   {
+    "role": "roles/bigquery.dataViewer",
+    "members": [
+     "user:lin@tidewater.example",
+     "group:privacy-officers@tidewater.example"
+    ]
+   }
+  ],
+  "b-landing": [
+   {
+    "role": "roles/storage.objectAdmin",
+    "members": [
+     "group:data-eng@tidewater.example"
+    ]
+   },
+   {
+    "role": "roles/storage.objectViewer",
+    "members": [
+     "serviceAccount:ingest-pipeline@tw-lake-prod.iam.gserviceaccount.com"
+    ]
+   }
+  ]
+ },
+ "deny": {
+  "org": [
+   {
+    "name": "pii-read-fence",
+    "deniedPrincipals": [
+     "principalSet://goog/public:all"
+    ],
+    "exceptionPrincipals": [
+     "group:privacy-officers@tidewater.example"
+    ],
+    "deniedPermissions": [
+     "bigquery.googleapis.com/tables.getData",
+     "bigquery.googleapis.com/tables.export"
+    ],
+    "denialCondition": "resource.matchTag('1001/pii', 'true')"
+   }
+  ],
+  "f-data-platform": [
+   {
+    "name": "contractors-no-delete",
+    "deniedPrincipals": [
+     "group:contractors@tidewater.example"
+    ],
+    "deniedPermissions": [
+     "bigquery.googleapis.com/tables.delete",
+     "bigquery.googleapis.com/datasets.delete",
+     "storage.googleapis.com/objects.*"
+    ],
+    "exceptionPermissions": [
+     "storage.googleapis.com/objects.get",
+     "storage.googleapis.com/objects.list"
+    ]
+   }
+  ],
+  "tw-lake-prod": [
+   {
+    "name": "only-the-pipeline-writes-prod",
+    "deniedPrincipals": [
+     "principalSet://goog/public:all"
+    ],
+    "exceptionPrincipals": [
+     "serviceAccount:ingest-pipeline@tw-lake-prod.iam.gserviceaccount.com"
+    ],
+    "deniedPermissions": [
+     "bigquery.googleapis.com/tables.updateData"
+    ],
+    "denialCondition": "resource.matchTag('1001/env', 'prod')"
+   }
+  ]
+ },
+ "cases": [
+  {
+   "id": "c01",
+   "request": {
+    "principal": "user:mei@tidewater.example",
+    "permission": "bigquery.tables.getData",
+    "resource": "t-cur-orders",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "allow",
+   "doc": "Policy inheritance: the effective allow policy is the union of the resource's policy and its ancestors'. Data Viewer on the dataset reaches its tables."
+  },
+  {
+   "id": "c02",
+   "request": {
+    "principal": "user:mei@tidewater.example",
+    "permission": "bigquery.tables.getData",
+    "resource": "t-raw-orders",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "not-granted",
+   "doc": "IAM overview: a request no binding allows is not granted. The analysts' Data Viewer grant sits on sales_curated only."
+  },
+  {
+   "id": "c03",
+   "request": {
+    "principal": "user:mei@tidewater.example",
+    "permission": "bigquery.jobs.create",
+    "resource": "tw-bi-prod",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "allow",
+   "doc": "Policy inheritance: the effective allow policy is the union of the resource's policy and its ancestors'. BigQuery User on tw-bi-prod includes bigquery.jobs.create."
+  },
+  {
+   "id": "c04",
+   "request": {
+    "principal": "user:mei@tidewater.example",
+    "permission": "bigquery.jobs.create",
+    "resource": "tw-lake-prod",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "not-granted",
+   "doc": "Policy inheritance: the effective allow policy is the union of the resource's policy and its ancestors'. A grant on folder analytics does not reach projects under data-platform."
+  },
+  {
+   "id": "c05",
+   "request": {
+    "principal": "user:raj@tidewater.example",
+    "permission": "bigquery.tables.getData",
+    "resource": "t-raw-orders",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "allow",
+   "doc": "Policy inheritance: the effective allow policy is the union of the resource's policy and its ancestors'. Data Editor on folder data-platform is inherited by every table below it."
+  },
+  {
+   "id": "c06",
+   "request": {
+    "principal": "user:raj@tidewater.example",
+    "permission": "bigquery.tables.updateData",
+    "resource": "t-raw-orders",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "deny",
+   "doc": "Deny overview: IAM always checks relevant deny policies before checking relevant allow policies. The project deny on updateData in env=prod beats the folder grant."
+  },
+  {
+   "id": "c07",
+   "request": {
+    "principal": "user:raj@tidewater.example",
+    "permission": "bigquery.tables.updateData",
+    "resource": "t-dev-orders",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "not-granted",
+   "doc": "Policy inheritance: the effective allow policy is the union of the resource's policy and its ancestors'. tw-lake-dev sits under folder sandbox, a sibling of data-platform."
+  },
+  {
+   "id": "c08",
+   "request": {
+    "principal": "serviceAccount:ingest-pipeline@tw-lake-prod.iam.gserviceaccount.com",
+    "permission": "bigquery.tables.updateData",
+    "resource": "t-raw-orders",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "allow",
+   "doc": "Deny overview: exception principals are exempt from the deny rule. IAM Conditions overview: a conditional binding grants only while its CEL expression is true. resource.name starts with .../datasets/sales_raw."
+  },
+  {
+   "id": "c09",
+   "request": {
+    "principal": "serviceAccount:ingest-pipeline@tw-lake-prod.iam.gserviceaccount.com",
+    "permission": "bigquery.tables.updateData",
+    "resource": "t-cur-orders",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "not-granted",
+   "doc": "IAM Conditions overview: a conditional binding grants only while its CEL expression is true. The name condition is false for sales_curated."
+  },
+  {
+   "id": "c10",
+   "request": {
+    "principal": "serviceAccount:ingest-pipeline@tw-lake-prod.iam.gserviceaccount.com",
+    "permission": "storage.objects.get",
+    "resource": "o-landing",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "allow",
+   "doc": "Policy inheritance: the effective allow policy is the union of the resource's policy and its ancestors'. Storage Object Viewer on the bucket reaches its objects."
+  },
+  {
+   "id": "c11",
+   "request": {
+    "principal": "serviceAccount:ingest-pipeline@tw-lake-prod.iam.gserviceaccount.com",
+    "permission": "storage.objects.delete",
+    "resource": "o-landing",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "not-granted",
+   "doc": "Roles reference: the role's permission list decides; a BigQuery role grants nothing on Cloud Storage. Object Viewer has no objects.delete."
+  },
+  {
+   "id": "c12",
+   "request": {
+    "principal": "user:lin@tidewater.example",
+    "permission": "bigquery.tables.getData",
+    "resource": "t-pii-members",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "deny",
+   "doc": "Deny overview: IAM always checks relevant deny policies before checking relevant allow policies. The org deny on pii=true tagged data beats a direct dataset grant."
+  },
+  {
+   "id": "c13",
+   "request": {
+    "principal": "user:zoe@tidewater.example",
+    "permission": "bigquery.tables.getData",
+    "resource": "t-pii-members",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "allow",
+   "doc": "Deny overview: exception principals are exempt from the deny rule. Privacy officers are exempt, then their Data Viewer grant applies."
+  },
+  {
+   "id": "c14",
+   "request": {
+    "principal": "user:ana@tidewater.example",
+    "permission": "bigquery.tables.updateData",
+    "resource": "t-dev-orders",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "allow",
+   "doc": "IAM Conditions overview: a conditional binding grants only while its CEL expression is true. request.time is before 2026-12-31."
+  },
+  {
+   "id": "c15",
+   "request": {
+    "principal": "user:ana@tidewater.example",
+    "permission": "bigquery.tables.updateData",
+    "resource": "t-dev-orders",
+    "time": "2027-01-15T09:00:00Z"
+   },
+   "expect": "not-granted",
+   "doc": "IAM Conditions overview: a conditional binding grants only while its CEL expression is true. After 2026-12-31 the binding no longer grants."
+  },
+  {
+   "id": "c16",
+   "request": {
+    "principal": "user:ana@tidewater.example",
+    "permission": "bigquery.tables.delete",
+    "resource": "t-dev-orders",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "allow",
+   "doc": "Deny overview: deny policies attach to an organization, folder or project and are inherited by all lower-level resources. The contractor deny sits on data-platform; tw-lake-dev is not below it."
+  },
+  {
+   "id": "c17",
+   "request": {
+    "principal": "user:ana@tidewater.example",
+    "permission": "bigquery.tables.delete",
+    "resource": "t-raw-orders",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "deny",
+   "doc": "Deny overview: deny policies attach to an organization, folder or project and are inherited by all lower-level resources. The contractor deny on data-platform covers tw-lake-prod."
+  },
+  {
+   "id": "c18",
+   "request": {
+    "principal": "user:ana@tidewater.example",
+    "permission": "storage.objects.get",
+    "resource": "o-landing",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "not-granted",
+   "doc": "Deny overview: exception permissions can be used even if they are in the denied permissions. objects.get is an exception, so the deny skips it; no allow exists either."
+  },
+  {
+   "id": "c19",
+   "request": {
+    "principal": "user:sam@tidewater.example",
+    "permission": "bigquery.tables.list",
+    "resource": "ds-sales_curated",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "allow",
+   "doc": "Roles overview: Viewer holds permissions for read-only actions (modelled); Editor adds state-changing actions. Viewer at the organization is inherited everywhere."
+  },
+  {
+   "id": "c20",
+   "request": {
+    "principal": "user:sam@tidewater.example",
+    "permission": "bigquery.tables.delete",
+    "resource": "t-cur-orders",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "not-granted",
+   "doc": "Roles overview: Viewer holds permissions for read-only actions (modelled); Editor adds state-changing actions. Deleting is not a read-only action."
+  },
+  {
+   "id": "c21",
+   "request": {
+    "principal": "user:sam@tidewater.example",
+    "permission": "bigquery.tables.getData",
+    "resource": "t-pii-members",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "deny",
+   "doc": "Deny overview: IAM always checks relevant deny policies before checking relevant allow policies. The pii fence applies to everyone not excepted."
+  },
+  {
+   "id": "c22",
+   "request": {
+    "principal": "user:mei@tidewater.example",
+    "permission": "storage.objects.get",
+    "resource": "o-landing",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "not-granted",
+   "doc": "Roles reference: the role's permission list decides; a BigQuery role grants nothing on Cloud Storage."
+  },
+  {
+   "id": "c23",
+   "request": {
+    "principal": "user:raj@tidewater.example",
+    "permission": "storage.objects.delete",
+    "resource": "o-landing",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "allow",
+   "doc": "Policy inheritance: the effective allow policy is the union of the resource's policy and its ancestors'. Storage Object Admin on the bucket includes objects.delete."
+  },
+  {
+   "id": "c24",
+   "kind": "binding",
+   "binding": {
+    "role": "roles/editor",
+    "members": [
+     "user:mei@tidewater.example"
+    ],
+    "condition": "request.time < timestamp('2026-12-31T00:00:00Z')"
+   },
+   "expect": "refused",
+   "doc": "IAM Conditions overview: you cannot use conditions when you grant legacy basic roles."
+  },
+  {
+   "id": "c25",
+   "kind": "binding",
+   "binding": {
+    "role": "roles/bigquery.dataViewer",
+    "members": [
+     "user:mei@tidewater.example"
+    ],
+    "condition": "request.time < timestamp('2026-12-31T00:00:00Z')"
+   },
+   "expect": "accepted",
+   "doc": "IAM Conditions overview: predefined BigQuery roles accept conditions on supported resource types."
+  },
+  {
+   "id": "c26",
+   "request": {
+    "principal": "user:mei@tidewater.example",
+    "permission": "bigquery.tables.updateData",
+    "resource": "t-cur-orders",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "deny",
+   "doc": "Deny overview: IAM always checks relevant deny policies before checking relevant allow policies. The prod write fence names every principal except the pipeline."
+  },
+  {
+   "id": "c27",
+   "request": {
+    "principal": "user:zoe@tidewater.example",
+    "permission": "bigquery.tables.getData",
+    "resource": "t-cur-orders",
+    "time": "2026-11-03T09:00:00Z"
+   },
+   "expect": "not-granted",
+   "doc": "Deny overview: exception principals are exempt from the deny rule. An exception lifts a deny; it never grants access by itself."
+  }
+ ],
+ "antilever": {
+  "member": "user:mei@tidewater.example",
+  "at": "tw-lake-prod",
+  "case": "c02",
+  "holds": "c26",
+  "count_on": "t-cur-orders"
+ }
+}

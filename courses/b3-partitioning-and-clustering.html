@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Builder session 3 of 8. Partition a BigQuery table by day, cluster it inside each partition, and measure the saving honestly: from 77.03 GiB for SELECT * down to the 10 MB minimum, with the exact and the modelled rungs labelled.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="Partitioning and clustering - learn gcp with phoebe">
+<meta property="og:description" content="Builder session 3 of 8. Three partitioning types, clustering and column order, and a bytes ladder from 77.03 GiB to 10 MB billed.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/courses/b3-partitioning-and-clustering.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Partitioning and clustering - learn gcp with phoebe">
+<meta name="twitter:description" content="Builder session 3 of 8. Partitions cut rows exactly; clustering cuts blocks, and only the run knows how many.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Builder session 3 · Partitioning and clustering - learn gcp with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=2">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-gcp-with-phoebe</a> / Builder session 3 of 8</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn GCP with Phoebe · Builder track · Session 3 of 8</div>
+    <h1>Partitioning and <span class="accent">clustering</span></h1>
+    <p class="sub">In session 2 the WHERE clause filtered the answer but not the bill. Tonight it cuts the bill. Partitioning splits a table into slices BigQuery can skip before reading; clustering sorts rows inside each slice so a filter can skip blocks too. You build a partitioned, clustered copy of January 2019 in the sandbox, and on your laptop you compute the bytes ladder the bench measures: 77.03 GiB for <code>SELECT *</code>, down to the 10 MB minimum.</p>
+    <div class="chip-row">
+      <span class="chip level">🟡 Core</span>
+      <span class="chip audience">Data engineers, analytics engineers, analysts who code</span>
+      <span class="chip audience">BigQuery sandbox plus Python, no card</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:4">3-18 · Partitions, clusters, an honest ladder</span>
+      <span class="a3" style="flex:5">18-40 · Build-along: a January table and the ladder</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where we start</h2>
+    </div>
+    <p class="lede">You know two things from session 2: a query's price is the columns it names times the rows it scans, and the estimate is visible before you run. Naming fewer columns was the first lever. Tonight adds the second and third: scanning fewer rows, by partition, and fewer storage blocks, by cluster. One rule for the whole evening: a saving you can count before running is exact; a saving only the run can count is modelled until you measure it. The bench in session 8 runs the same engine you run on your laptop tonight.</p>
+
+    <div class="legend">
+      <span class="pill">🎫 Clear all three quiz questions to stamp your passport</span>
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">★ Build-along = you make the artifact</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> A table in your sandbox partitioned by day and clustered by pickup area, with a partition filter it refuses to run without, and a four-rung ladder printed on your laptop: 77.0251 GiB, 4.5816 GiB, 0.0263 GiB and 0.0037 GiB processed, the last two billed at 27 MB and the 10 MB minimum.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers the three partitioning types</span>
+      <h2>Three ways to slice a table</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">A partitioned table is stored as slices, and a query that filters on the partitioning column only reads the slices it needs. BigQuery offers three ways to cut. By a <strong>time-unit column</strong>, a date or timestamp column in your own data. By <strong>ingestion time</strong>, where BigQuery stamps each row with the time it was loaded in the pseudo-column <code>_PARTITIONTIME</code>, hourly, daily, monthly or yearly. Or by an <strong>integer range</strong>, with a start, an end and an interval; Google's own example cuts <code>customer_id</code> from 0 to 100 in steps of 10.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="One table cut three ways, side by side. Left, time-unit column: DATE of trip_start_timestamp, one slice per day, 2019-01-01, 2019-01-02 highlighted as the one slice a one-day filter reads, 2019-01-03, and so on. Middle, ingestion time: the pseudo-column _PARTITIONTIME, slices by load time, hourly, daily, monthly or yearly. Right, integer range: Google's example customer_id from 0 to 100 in steps of 10, slices 0-9, 10-19, 20-29 and so on.">
+        <defs>
+          <filter id="b3aSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="37" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+        </defs>
+        <style>
+          .b3aH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b3aL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b3aS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b3aA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b3aN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="b3aH" x="30" y="26">ONE TABLE, THREE WAYS TO CUT IT INTO SLICES BIGQUERY CAN SKIP</text>
+
+        <g filter="url(#b3aSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="44" width="260" height="240" rx="10" transform="rotate(-0.4 160 164)" fill="#FFFFFF"/>
+          <rect x="310" y="44" width="260" height="240" rx="10" transform="rotate(0.3 440 164)" fill="#FFFFFF"/>
+          <rect x="590" y="44" width="260" height="240" rx="10" transform="rotate(-0.3 720 164)" fill="#FFFFFF"/>
+          <rect x="46" y="100" width="228" height="26" rx="5" fill="#E8F0FE"/>
+          <rect x="46" y="134" width="228" height="26" rx="5" fill="#FBBC04"/>
+          <rect x="46" y="168" width="228" height="26" rx="5" fill="#E8F0FE"/>
+          <rect x="46" y="202" width="228" height="26" rx="5" fill="#E8F0FE"/>
+          <rect x="326" y="100" width="228" height="26" rx="5" fill="#E8F0FE"/>
+          <rect x="326" y="134" width="228" height="26" rx="5" fill="#E8F0FE"/>
+          <rect x="326" y="168" width="228" height="26" rx="5" fill="#E8F0FE"/>
+          <rect x="326" y="202" width="228" height="26" rx="5" fill="#E8F0FE"/>
+          <rect x="606" y="100" width="228" height="26" rx="5" fill="#E8F0FE"/>
+          <rect x="606" y="134" width="228" height="26" rx="5" fill="#E8F0FE"/>
+          <rect x="606" y="168" width="228" height="26" rx="5" fill="#E8F0FE"/>
+          <rect x="606" y="202" width="228" height="26" rx="5" fill="#E8F0FE"/>
+        </g>
+
+        <text class="b3aL" x="46" y="68">Time-unit column</text>
+        <text class="b3aS" x="46" y="86">DATE(trip_start_timestamp), daily</text>
+        <text class="b3aL" x="58" y="117">2019-01-01</text>
+        <text class="b3aL" x="58" y="151">2019-01-02</text>
+        <text class="b3aL" x="58" y="185">2019-01-03</text>
+        <text class="b3aS" x="58" y="219">... one slice per day</text>
+        <text class="b3aA" x="46" y="252">a one-day filter reads one slice</text>
+        <text class="b3aS" x="46" y="270">tonight's build uses this type</text>
+
+        <text class="b3aL" x="326" y="68">Ingestion time</text>
+        <text class="b3aS" x="326" y="86">_PARTITIONTIME, stamped at load</text>
+        <text class="b3aL" x="338" y="117">loaded on day 1</text>
+        <text class="b3aL" x="338" y="151">loaded on day 2</text>
+        <text class="b3aL" x="338" y="185">loaded on day 3</text>
+        <text class="b3aS" x="338" y="219">... per load period</text>
+        <text class="b3aA" x="326" y="252">hourly, daily, monthly or yearly</text>
+        <text class="b3aS" x="326" y="270">no date column needed in the data</text>
+
+        <text class="b3aL" x="606" y="68">Integer range</text>
+        <text class="b3aS" x="606" y="86">customer_id, 0 to 100, interval 10</text>
+        <text class="b3aL" x="618" y="117">0 to 9</text>
+        <text class="b3aL" x="618" y="151">10 to 19</text>
+        <text class="b3aL" x="618" y="185">20 to 29</text>
+        <text class="b3aS" x="618" y="219">... up to the end, 100</text>
+        <text class="b3aA" x="606" y="252">start, end and interval</text>
+        <text class="b3aS" x="606" y="270">Google's own example values</text>
+
+        <text class="b3aN" x="30" y="308">The partitioning column decides which filter saves bytes: a filter on any other column still reads every slice.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow slice is all a one-day query reads once the table is cut by day; without the cut it reads every day</figcaption>
+    </figure>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>require_partition_filter: make the cheap query the only query<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Partitioning only saves money when the query filters on the partitioning column. People forget. The table option <code>require_partition_filter = TRUE</code> turns that forgetting into an error: a query on the table without a filter on the partitioning column is refused instead of reading every partition. Session 1 met the same switch for hive-partitioned files, <code>requirePartitionFilter</code>. Set it on any large partitioned table that people query by hand; the first refused query teaches the habit faster than any guideline.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Choosing the type<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Use a <strong>time-unit column</strong> when the data carries the time people filter on, as the taxi trips do with <code>trip_start_timestamp</code>: an event's own time is what analysts ask about. Use <strong>ingestion time</strong> when rows arrive without a trustworthy timestamp, or when "what did we load yesterday" is the real question. Use an <strong>integer range</strong> when the filter is a numeric key, a store number or a customer bucket, with evenly spread values. A rule of thumb that is ours, not Google's: if nobody filters on the column, it is the wrong partitioning column, however natural it looks.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The events table partitioned on the wrong day.</strong> A team partitions its sales events by load time because the pipeline is easy that way, then every analyst filters on the sale date. Late-arriving files spread one sale day across many load days, so every query reads far more slices than it needs. Re-partitioning on the sale date fixes it, at the cost of rewriting the table once. The story is a constructed composite.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers clustering and column order</span>
+      <h2>Sorted blocks inside each slice</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">Clustering works inside the slices. In Google's words, "Clustered tables in BigQuery sort data in storage blocks based on the values in user-defined clustered columns". A filter on a clustered column can then skip every block whose values cannot match. The catch is the timing: "the number of blocks to scan isn't known until a query runs", so you do not get an accurate estimate before execution. Partitioning is planned; clustering is discovered.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 290" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="One day partition of the taxi table, its rows sorted by pickup_community_area and cut into eight blocks, from NULLs first up to area 77. A filter WHERE pickup_community_area equals 56 touches only the two blocks whose value ranges include 56; the other six blocks are skipped. A note says the blocks of 5,000 rows are the bench's model and the ranges drawn are illustrative.">
+        <defs>
+          <filter id="b3bSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="41" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <marker id="b3bAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b3bH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b3bL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b3bS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b3bA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b3bN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="b3bH" x="30" y="26">ONE DAY PARTITION, SORTED BY PICKUP AREA, CUT INTO BLOCKS</text>
+
+        <g filter="url(#b3bSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="44" width="820" height="150" rx="10" transform="rotate(0.2 440 119)" fill="#E8F0FE"/>
+          <rect x="46" y="80" width="92" height="70" rx="6" transform="rotate(-1 92 115)" fill="#FFFFFF"/>
+          <rect x="146" y="80" width="92" height="70" rx="6" transform="rotate(1 192 115)" fill="#FFFFFF"/>
+          <rect x="246" y="80" width="92" height="70" rx="6" transform="rotate(-0.8 292 115)" fill="#FFFFFF"/>
+          <rect x="346" y="80" width="92" height="70" rx="6" transform="rotate(0.8 392 115)" fill="#FFFFFF"/>
+          <rect x="446" y="80" width="92" height="70" rx="6" transform="rotate(-1 492 115)" fill="#FFFFFF"/>
+          <rect x="546" y="80" width="92" height="70" rx="6" transform="rotate(1 592 115)" fill="#FBBC04"/>
+          <rect x="646" y="80" width="92" height="70" rx="6" transform="rotate(-0.8 692 115)" fill="#FBBC04"/>
+          <rect x="746" y="80" width="92" height="70" rx="6" transform="rotate(0.8 792 115)" fill="#FFFFFF"/>
+          <path d="M642 214 L642 158" marker-end="url(#b3bAr)"/>
+        </g>
+
+        <text class="b3bL" x="46" y="66">One day partition, rows sorted by pickup_community_area</text>
+        <text class="b3bL" x="56" y="108">block 1</text>
+        <text class="b3bS" x="56" y="128">NULL</text>
+        <text class="b3bL" x="156" y="108">block 2</text>
+        <text class="b3bS" x="156" y="128">1 to 6</text>
+        <text class="b3bL" x="256" y="108">block 3</text>
+        <text class="b3bS" x="256" y="128">6 to 8</text>
+        <text class="b3bL" x="356" y="108">block 4</text>
+        <text class="b3bS" x="356" y="128">8 to 28</text>
+        <text class="b3bL" x="456" y="108">block 5</text>
+        <text class="b3bS" x="456" y="128">28 to 41</text>
+        <text class="b3bL" x="556" y="108">block 6</text>
+        <text class="b3bL" x="556" y="128">41 to 56</text>
+        <text class="b3bL" x="656" y="108">block 7</text>
+        <text class="b3bL" x="656" y="128">56 to 76</text>
+        <text class="b3bL" x="756" y="108">block 8</text>
+        <text class="b3bS" x="756" y="128">76 to 77</text>
+
+        <text class="b3bL" x="380" y="232">WHERE pickup_community_area = 56</text>
+        <text class="b3bA" x="660" y="232">reads 2 blocks, skips 6</text>
+
+        <text class="b3bN" x="30" y="260">Modelled: blocks of 5,000 rows with NULLs first, as on the bench; the ranges drawn for this one day are illustrative.</text>
+        <text class="b3bN" x="30" y="278">BigQuery does not publish its real block layout, so only a run tells you how many blocks it skipped.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - area 56 straddles two blocks, so both are read: a value on a block edge costs a second block</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Column order matters<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A table can be clustered by several columns, and the order you list them in is the order the rows are sorted. Google's clustered-tables page explains that order matters: the sort is by the first column, then by the second within equal values of the first, and so on. So a filter on the first clustered column can skip blocks well; a filter only on the second or third, with nothing on the first, usually cannot, because those values are scattered across the blocks. Put first the column people filter on most, and filter on it in your queries.</p>
+        <p>For the taxi table, <code>pickup_community_area</code> first makes sense if dashboards are cut by area. If they are mostly cut by company, it should be <code>company</code>. The data does not decide this; the queries do.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>How the bench models what Google does not publish<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Google does not publish block sizes or how a real clustered table is laid out, so the bench uses a stated model: each January 2019 day partition sorted by <code>pickup_community_area</code>, NULLs first, cut into blocks of 5,000 rows, and a filter reads every block its value touches. Under that model, area 56 (Midway) touches 36 of 257 blocks in January, 172,753 rows. That is a teaching model, labelled modelled wherever it appears. The real figure comes from running the query and reading the bytes billed in the job details.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>Clustered by the column nobody filters on first.</strong> A loyalty table is clustered by <code>(member_tier, store_id)</code> because tier was the first column in the source file. Every report filters by store. The clustering helps almost nothing until the order is swapped. The story is a constructed composite.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-3">
+    <div class="section-kicker">
+      <span class="klabel">Part 3 · covers measuring the saving honestly</span>
+      <h2>The ladder, rung by rung</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">Here is one question asked of the full taxi table four ways, computed from BigQuery's documented logical sizes per data type and the table's 211,670,894 rows. Each rung adds one lever. The first three rungs are exact arithmetic on documented rules and exact row counts. The fourth is modelled. Saying which is which is part of the job.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four bars, not to scale. SELECT star, 23 columns times 211,670,894 rows: 77.03 GiB processed. Three named columns, all rows: 4.58 GiB. Plus day partitions, January 2019, 1,213,529 rows: 0.0263 GiB processed, 27 MB billed. Plus clustering on area 56, 172,753 rows, modelled: 0.0037 GiB processed, 10 MB billed, the minimum, 36 of 257 modelled blocks. The last bar is highlighted as the only modelled rung.">
+        <defs>
+          <filter id="b3cSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="47" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b3cHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+        </defs>
+        <style>
+          .b3cH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b3cL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b3cS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b3cV { font: 800 16px Inter, sans-serif; fill: #174EA6; }
+          .b3cN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="b3cH" x="30" y="26">ONE QUESTION, FOUR RUNGS (BARS NOT TO SCALE; COMPUTED BY THE BENCH ENGINE)</text>
+
+        <g filter="url(#b3cSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="250" y="50" width="480" height="40" rx="6" transform="rotate(-0.4 490 70)" fill="url(#b3cHc)"/>
+          <rect x="250" y="110" width="300" height="40" rx="6" transform="rotate(0.4 400 130)" fill="url(#b3cHc)"/>
+          <rect x="250" y="170" width="120" height="40" rx="6" transform="rotate(-0.6 310 190)" fill="url(#b3cHc)"/>
+          <rect x="250" y="230" width="50" height="40" rx="6" transform="rotate(1 275 250)" fill="#FBBC04"/>
+        </g>
+
+        <text class="b3cL" x="30" y="68">SELECT *</text>
+        <text class="b3cS" x="30" y="84">23 columns, 211,670,894 rows</text>
+        <text class="b3cV" x="744" y="76">77.03 GiB</text>
+        <text class="b3cL" x="30" y="128">three named columns</text>
+        <text class="b3cS" x="30" y="144">3 columns, 211,670,894 rows</text>
+        <text class="b3cV" x="564" y="136">4.58 GiB</text>
+        <text class="b3cL" x="30" y="188">+ day partitions</text>
+        <text class="b3cS" x="30" y="204">January 2019: 1,213,529 rows</text>
+        <text class="b3cV" x="384" y="196">0.0263 GiB, 27 MB billed</text>
+        <text class="b3cL" x="30" y="248">+ cluster, area 56</text>
+        <text class="b3cS" x="30" y="264">172,753 rows (modelled)</text>
+        <text class="b3cV" x="314" y="256">0.0037 GiB, 10 MB billed</text>
+        <text class="b3cS" x="314" y="276">36 of 257 modelled blocks; 10 MB is the per-query minimum</text>
+
+        <text class="b3cN" x="30" y="304">Rungs 1 to 3 are exact arithmetic on documented sizes and exact row counts. Rung 4 rests on the bench's block model.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow rung is the only modelled one; below 10 MB every query on one table bills the same</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Exact savings and modelled savings<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>Columns are exact.</strong> Logical sizes are documented per type, 8 bytes for an INT64, FLOAT64 or TIMESTAMP, 2 bytes plus the text length for a STRING, so three columns instead of 23 is arithmetic: 77.03 GiB becomes 4.58 GiB. <strong>Partitions are exact.</strong> January 2019 has 1,213,529 trips, an exact count from the city's portal, so a filter on that month reads exactly those rows: 0.0263 GiB, billed at 27 MB because charges round up to the nearest MB. <strong>Clustering is modelled.</strong> The 36 of 257 blocks come from the bench's block model, and Google says the number of blocks to scan is not known until a query runs. The dry run on a clustered table is therefore an upper bound, and the real saving can be larger or smaller than the model's.</p>
+        <p>One more honest note: the last rung processes 0.0037 GiB but bills 10 MB, because BigQuery charges "a minimum 10 MB data processed per table referenced by the query". Past a point, cutting bytes no longer shows on the bill.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Measure it yourself on the real table<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>After the build-along, run the same three-column query on your new table twice, once filtered to one day and once filtered to one day and area 56. Open each job's details and note the bytes processed and billed. The partition rung should match the exact arithmetic closely for your one day; the cluster rung is the number that replaces the model for your table. Record both, with the date, because Google can change storage internals without notice.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The clustering win that was already a partition win.</strong> A team reports a large saving from adding clustering, but they added a date filter on the partitioned column in the same change. Measured rung by rung, nearly all of the saving was the partition filter. The story is a constructed composite; the lesson is to add one lever at a time and measure each.</p>
+    </div>
+  </section>
+
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>A January table and the bytes ladder</h2>
+      <span class="tag demo">★ 22 min · everyone builds</span>
+    </div>
+    <p class="lede">Two halves. In the sandbox you create a partitioned, clustered copy of January 2019 and watch the partition filter work, and refuse. On your laptop you compute the four rungs from the bench's engine, so the numbers you saw in Part 3 come out of code you can read.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 226" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The public taxi table of 211,670,894 rows feeds a CREATE TABLE AS SELECT, which writes tw_lab.trips_jan2019: 31 day partitions clustered by pickup area, about 1,213,529 trips. A query with a day filter reads one partition. A query with no partition filter is refused before reading anything, because require_partition_filter is on.">
+        <defs>
+          <filter id="b3dSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="53" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b3dHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="b3dAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b3dL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b3dS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b3dW { font: 800 12px Inter, sans-serif; fill: #FFFFFF; }
+          .b3dR { font: 800 11px Inter, sans-serif; fill: #991B1B; }
+          .b3dN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#b3dSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="70" width="170" height="70" rx="8" transform="rotate(-1 115 105)" fill="url(#b3dHc)"/>
+          <rect x="240" y="70" width="130" height="70" rx="8" transform="rotate(0.8 305 105)" fill="#174EA6" stroke="#174EA6"/>
+          <rect x="410" y="40" width="230" height="134" rx="10" transform="rotate(-0.4 525 107)" fill="#FFFFFF"/>
+          <rect x="426" y="74" width="198" height="50" rx="5" fill="#E8F0FE"/>
+          <path d="M440 76 L440 122 M454 76 L454 122 M468 76 L468 122 M496 76 L496 122 M510 76 L510 122 M524 76 L524 122 M538 76 L538 122 M552 76 L552 122 M566 76 L566 122 M580 76 L580 122 M594 76 L594 122 M608 76 L608 122" stroke="#1A73E8"/>
+          <rect x="471" y="77" width="22" height="44" rx="3" fill="#FBBC04"/>
+          <rect x="680" y="40" width="170" height="60" rx="8" transform="rotate(1 765 70)" fill="#FFFFFF"/>
+          <rect x="680" y="120" width="170" height="60" rx="8" transform="rotate(-1 765 150)" fill="#FEF2F2" stroke="#991B1B"/>
+          <path d="M204 105 L232 105" marker-end="url(#b3dAr)"/>
+          <path d="M374 105 L402 105" marker-end="url(#b3dAr)"/>
+          <path d="M644 84 L672 72" marker-end="url(#b3dAr)"/>
+          <path d="M644 132 L672 148" marker-end="url(#b3dAr)"/>
+        </g>
+
+        <text class="b3dL" x="44" y="100">public taxi_trips</text>
+        <text class="b3dS" x="44" y="118">211,670,894 rows</text>
+        <text class="b3dW" x="254" y="100">CREATE TABLE</text>
+        <text class="b3dW" x="254" y="118">AS SELECT</text>
+        <text class="b3dL" x="426" y="62">tw_lab.trips_jan2019</text>
+        <text class="b3dS" x="426" y="146">31 day partitions, clustered</text>
+        <text class="b3dS" x="426" y="162">about 1,213,529 trips</text>
+        <text class="b3dL" x="694" y="66">with a day filter</text>
+        <text class="b3dS" x="694" y="84">reads one partition</text>
+        <text class="b3dL" x="694" y="146">no partition filter</text>
+        <text class="b3dR" x="694" y="164">refused before reading</text>
+
+        <text class="b3dN" x="30" y="206">require_partition_filter turns a forgotten WHERE into an error instead of a full read.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow slice is the one day your filtered query reads; the red box is the query the table option refuses</figcaption>
+    </figure>
+
+    <div class="callout tip">
+      <p><strong>In the sandbox.</strong> Runs in the BigQuery sandbox: no card, no billing account. Steps 1 and 2 run there and their outputs are "expected, your numbers will differ". <code>CREATE TABLE ... AS SELECT</code> is DDL, a statement that defines a table; the sandbox's unsupported list names DML, the statements that change rows, such as <code>INSERT</code> and <code>UPDATE</code>. If your sandbox still refuses the statement, its error message says why; read it before changing anything.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>Create a dataset and the January table.</strong> In the Explorer, create a dataset named <code>tw_lab</code> in your sandbox project, in the same location the public <code>chicago_taxi_trips</code> dataset shows on its Details tab. Then dry-run the statement below before you run it. Whether the public source table is itself partitioned is not verified on these pages, so budget for the worst case, a full 23-column read about the size of the bench's <code>SELECT *</code> rung, 77.03 GiB of your free 1 TiB, and let the dry run show the real number. The new table stores about January's 1,213,529 trips; at the bench's 390.7 logical bytes per row that is modelled at about 0.44 GiB, well inside the 10 GiB lifetime storage.</p>
+        <div class="prompt-box good"><span class="label">★ Step 1 · sandbox DDL (expected, your numbers will differ)</span>CREATE TABLE `YOUR_PROJECT.tw_lab.trips_jan2019`
+PARTITION BY DATE(trip_start_timestamp)
+CLUSTER BY pickup_community_area
+OPTIONS (require_partition_filter = TRUE, partition_expiration_days = 60)
+AS
+SELECT *
+FROM `bigquery-public-data.chicago_taxi_trips.taxi_trips`
+WHERE trip_start_timestamp &gt;= TIMESTAMP '2019-01-01'
+  AND trip_start_timestamp &lt;  TIMESTAMP '2019-02-01';
+
+-- expected: a new table with 31 day partitions, clustered by pickup_community_area;
+-- its Details tab shows the row count and size. Your numbers will differ.</div>
+      </div>
+      <div class="step">
+        <p><strong>Query it with and without the partition filter.</strong> Dry-run both first and compare the estimates. The first should fall to roughly one day's share of the three columns; the second should be refused outright.</p>
+        <div class="prompt-box good"><span class="label">★ Step 2 · sandbox queries (expected, your numbers will differ)</span>-- A: with a partition filter, reads one day partition
+SELECT payment_type, COUNT(*) AS trips, ROUND(AVG(fare), 2) AS avg_fare
+FROM `YOUR_PROJECT.tw_lab.trips_jan2019`
+WHERE DATE(trip_start_timestamp) = '2019-01-15'
+  AND pickup_community_area = 56
+GROUP BY payment_type;
+
+-- B: no partition filter, refused because require_partition_filter is on
+SELECT payment_type, COUNT(*) AS trips
+FROM `YOUR_PROJECT.tw_lab.trips_jan2019`
+GROUP BY payment_type;
+
+-- expected: A runs, and its job details show the bytes processed and billed;
+-- B fails with an error asking for a filter on the partitioning column.</div>
+      </div>
+      <div class="step">
+        <p><strong>Compute the ladder on your laptop.</strong> Use session 1's environment; this script needs nothing beyond the standard library. It imports <code>cost_ref.py</code>, the Python twin of the engine behind the bench, which reads the bench data file <code>gcp-sample.json</code>. Run it next to the engine files, or pass their folder as the first argument; the same engine runs live on builder session 8's bench.</p>
+        <div class="prompt-box good"><span class="label">★ Step 3 · get the engine files (same folder as the script)</span>curl -O https://phoebefu6.github.io/learn-gcp-with-phoebe/materials/cost_ref.py
+curl -O https://phoebefu6.github.io/learn-gcp-with-phoebe/materials/gcp-sample.json</div>
+        <div class="prompt-box good"><span class="label">★ Step 3 · b3_ladder.py, part 1</span># Builder session 3: the bytes ladder, computed from BigQuery's documented data type sizes.
+# Same engine as the bench (cost_ref.py, the Python twin of the bench's gcp-cost.js).
+import os, sys
+sys.path.insert(0, sys.argv[1] if len(sys.argv) &gt; 1 else ".")
+import cost_ref as C
+GiB = 1 &lt;&lt; 30
+print(f"scale: {C.S['full_rows']:,} table rows / {C.S['sample_rows']:,} sample rows")</div>
+        <div class="prompt-box good"><span class="label">★ Step 3 · b3_ladder.py, part 2</span>for r in C.ladder():
+    extra = ""
+    if r["blocks"]:
+        extra = f"  ({r['blocks']['blocks']} of {r['blocks']['allBlocks']} modelled blocks)"
+    print(f"{r['id']:6s} rows {r['rows']:&gt;12,d}  processed {r['bytes'] / GiB:&gt;9.4f} GiB  "
+          f"billed {r['billed'] / (1 &lt;&lt; 20):&gt;10,.0f} MB  ${r['cost']:.4f}{extra}")</div>
+      </div>
+      <div class="step">
+        <p><strong>Run it and compare with this real output.</strong> The dollar column is on-demand at $6.25 per TiB, us-central1, BigQuery pricing page, 3 November 2026; prices change, so re-verify before you quote them. Inside the first free TiB of a month, none of these would bill at all. The cluster rung's blocks are modelled.</p>
+        <div class="prompt-box good"><span class="label">★ Step 4 · python b3_ladder.py (real output)</span>scale: 211,670,894 table rows / 18,362 sample rows
+star   rows  211,670,894  processed   77.0251 GiB  billed     78,874 MB  $0.4701
+named  rows  211,670,894  processed    4.5816 GiB  billed      4,692 MB  $0.0280
+part   rows    1,213,529  processed    0.0263 GiB  billed         27 MB  $0.0002
+clus   rows      172,753  processed    0.0037 GiB  billed         10 MB  $0.0001  (36 of 257 modelled blocks)</div>
+      </div>
+    </div>
+
+    <div class="prompt-box bad"><span class="label">✗ Partitioned, then queried as if it were not</span>SELECT *
+FROM `YOUR_PROJECT.tw_lab.trips_jan2019`
+WHERE payment_type = 'Cash'   -- filters rows, not partitions
+-- without require_partition_filter this would read every day partition</div>
+
+    <p class="mono" style="margin-top:14px">Data notice, as the City of Chicago's Terms of Use require: This site provides applications using data that has been modified for use from its original source, www.cityofchicago.org, the official website of the City of Chicago. The City of Chicago makes no claims as to the content, accuracy, timeliness, or completeness of any of the data provided at this site. The data provided at this site is subject to change at any time. It is understood that the data provided at this site is being used at one's own risk.</p>
+  </section>
+
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 4</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li><strong>Replace the model with a measurement.</strong> Run query A from step 2 and record bytes processed and billed from the job details. Then drop the area filter and run again. Write down the cluster saving your table actually showed.</li>
+      <li><strong>Swap the cluster column.</strong> In <code>cost_ref.py</code>, change the cluster value 56 in <code>ladder()</code> to another area and rerun the ladder. Which areas touch the most blocks, and why?</li>
+      <li><strong>Pick a partitioning type for a table you know.</strong> One table from work: time-unit column, ingestion time or integer range? Name the column and the filter people actually use.</li>
+      <li><strong>Read one clustered-table bill.</strong> In the sandbox, open the job history and find the query with the lowest bytes billed. Is it at the 10 MB minimum?</li>
+    </ol>
+  </section>
+
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+    <p>Clear all three and builder session 3 gets stamped in your passport.</p>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">1 · What does <code>require_partition_filter = TRUE</code> do on a partitioned table?</p>
+      <button class="qopt" type="button">A · It partitions the table automatically by load time</button>
+      <button class="qopt" type="button">B · It caps the bytes any query may bill</button>
+      <button class="qopt" type="button">C · It refuses any query that does not filter on the partitioning column, instead of letting it read every partition</button>
+      <button class="qopt" type="button">D · It makes clustering estimates exact</button>
+      <p class="qwhy">It turns a forgotten partition filter into an error. The byte cap is a different setting, <code>maximum_bytes_billed</code>, from session 2.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">2 · A table is clustered by <code>(pickup_community_area, company)</code>. Which filter lets BigQuery skip the most blocks?</p>
+      <button class="qopt" type="button">A · A filter on <code>pickup_community_area</code>, the first clustered column</button>
+      <button class="qopt" type="button">B · A filter on <code>company</code> alone</button>
+      <button class="qopt" type="button">C · Any filter, order does not matter</button>
+      <button class="qopt" type="button">D · A LIMIT clause</button>
+      <p class="qwhy">Rows are sorted by the first clustered column first, so its values sit together in few blocks. Values of the second column are scattered unless the first is also filtered.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="3">
+      <p class="qtext">3 · Why is the cluster rung, 36 of 257 blocks, labelled modelled when the partition rung is not?</p>
+      <button class="qopt" type="button">A · Because clustered tables are billed on compressed bytes</button>
+      <button class="qopt" type="button">B · Because the partition rung is also a guess</button>
+      <button class="qopt" type="button">C · Because the sandbox does not allow clustering</button>
+      <button class="qopt" type="button">D · Because Google does not publish the block layout and the number of blocks to scan is only known when the query runs, so the bench uses a stated model of 5,000-row blocks</button>
+      <p class="qwhy">The partition rung is exact: January 2019's 1,213,529 trips are an exact count. The cluster rung rests on a block model, and the dry run on a clustered table is only an upper bound.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What this session teaches, and where it came from</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Time-unit column, ingestion time and integer-range partitioning; require_partition_filter</span><span class="note">BigQuery, Introduction to partitioned tables, read at source on 3 November 2026</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Clustering sorts storage blocks; block count unknown before the run; column order matters</span><span class="note">BigQuery, Introduction to clustered tables, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Upper-bound estimates, rounding to the MB and the 10 MB minimum</span><span class="note">Estimate and control costs; BigQuery pricing, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Logical sizes per data type</span><span class="note">BigQuery data types, data type sizes, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">The ladder output</span><span class="note">Real run of b3_ladder.py on the bench engine; rows 211,670,894 from the portal's column statistics, January 2019 counts exact from the portal</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Cluster blocks (5,000 rows, NULLs first), the 0.44 GiB storage estimate, the illustrative block ranges</span><span class="note">Modelled, labelled where shown</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Events, loyalty and clustering-win stories</span><span class="note">Constructed composites</span></div>
+    </div>
+    <p class="mono" style="margin-top:14px">Every fact on this page, and its verification tier, is recorded in the course's source map.</p>
+  </section>
+
+  <section class="cheat" id="cheatsheet">
+    <h3>Builder session 3 cheat sheet <span>· pin this</span></h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>Partition types</b><span>Time-unit column, ingestion time (<code>_PARTITIONTIME</code>), integer range.</span></div>
+      <div class="cheat-item"><b>Guard</b><span><code>require_partition_filter = TRUE</code>: no partition filter, no query.</span></div>
+      <div class="cheat-item"><b>Clustering</b><span>Sorts rows into storage blocks; a filter skips blocks. Known only at run time.</span></div>
+      <div class="cheat-item"><b>Order</b><span>Cluster first by the column people filter on most, and filter on it.</span></div>
+      <div class="cheat-item"><b>The ladder</b><span>77.03 GiB, 4.58 GiB, 27 MB billed, 10 MB billed (the last one modelled).</span></div>
+      <div class="cheat-item"><b>Floor</b><span>10 MB minimum per table referenced and per query. Below it, savings stop showing.</span></div>
+    </div>
+  </section>
+
+  <div class="callout next">
+    <span class="nx-pill">Next session</span>
+    <p>You now know what a query costs. Session 4 asks who is allowed to run it: IAM as GCP evaluates it, deny before allow, allow unioned down Tidewater's hierarchy, with a Python evaluator tracing five real cases.</p>
+  </div>
+
+  <footer class="pagefoot">
+    <span>Builder session 3 of 8 · learn-gcp-with-phoebe · by Phoebe Fu &nbsp;·&nbsp; 📚 <a href="https://phoebefu6.github.io/learn-with-phoebe/">Learn with Phoebe ↗</a></span>
+    <span><a href="b2-bigquery-in-the-sandbox.html">← Prev: BigQuery in the sandbox</a> &nbsp;·&nbsp; <a href="b4-iam-as-gcp-evaluates-it.html">Next: IAM as GCP evaluates it →</a></span>
+  </footer>
+
+</main>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Leader session 1 of 6. What Google Cloud actually is to a data team: organization, folders and projects, where billing and access attach, regions and multi-regions, and the meters a data platform runs on.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="What GCP is to a data team - learn gcp with phoebe">
+<meta property="og:description" content="Leader session 1 of 6. A project is where billing and access meet. SELECT * on a 77 GiB public table costs $0.47 a run; three named columns cost $0.03.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/courses/a1-what-gcp-is-to-a-data-team.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="What GCP is to a data team - learn gcp with phoebe">
+<meta name="twitter:description" content="Leader session 1 of 6. The resource hierarchy, locations, the AWS name map and the meters.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Leader session 1 · What GCP is to a data team - learn gcp with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=2">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-gcp-with-phoebe</a> / Leader session 1 of 6</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn GCP with Phoebe · Leader track · Session 1 of 6</div>
+    <h1>What GCP is to a <span class="accent">data team</span></h1>
+    <p class="sub">Google Cloud lists hundreds of products. A data team lives in a handful of them, and almost every decision a data leader signs off on is one of three questions: which project the work lives in, who may touch it, and which meter runs while somebody reads it. Tonight we draw the map: the organization, folders and projects that hold everything, where your bytes physically sit, the few services a data platform is built from, and the meters behind the bill.</p>
+    <div class="chip-row">
+      <span class="chip level">🟢 Foundations</span>
+      <span class="chip audience">Data and AI leaders, managers, architects</span>
+      <span class="chip audience">No code, no account</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:4">3-18 · Hierarchy, locations, services, meters</span>
+      <span class="a3" style="flex:5">18-40 · Build-along: your hierarchy on one sheet</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where we start</h2>
+    </div>
+    <p class="lede">Most Google Cloud introductions open the console and click through icons. A data leader needs a different first sentence: Google Cloud is a tree of containers, with an organization at the root and projects at the leaves, and the project is where three things meet: the bill, the permissions and the services. Once that sentence is clear, the six leader sessions are details of it. BigQuery as the warehouse and the lake, IAM down the tree, pipelines without servers, the bytes behind the bill, and one platform on a page. The eight builder sessions do the same work in the free BigQuery sandbox and on a laptop, on real Chicago taxi trips.</p>
+
+    <div class="legend">
+      <span class="pill">🎫 Clear all three quiz questions to stamp your passport</span>
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">★ Build-along = you make the artifact</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> A one-page sketch of your company's Google Cloud hierarchy, or the one you would build, with every project tagged by who pays, who owns it and which meter it runs on, and one sentence to repeat in every budget meeting: on BigQuery's on-demand price, <code>SELECT *</code> on a 77 GiB public table costs $0.4701 a run, and three named columns from the same table cost $0.0280.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers the resource hierarchy, projects and billing</span>
+      <h2>A tree with the bill at the leaves</h2>
+      <span class="tag concept">6 min live</span>
+    </div>
+    <p class="lede">Google describes the hierarchy in one line: "the organization (root) at the top, followed by folders (optional) for grouping, and then projects". Every resource except the root has exactly one parent. Datasets, buckets and jobs live inside projects, and a project is what Google calls essential for "enabling billing, adding and removing collaborators, and managing permissions". For a data team that makes the project the unit you budget, secure and hand to an owner.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A tree for the constructed company Tidewater Grocers. The root is the organization tidewater.example. Below it three folders: data-platform, analytics and sandbox. Each folder holds one project: tw-lake-prod, tw-bi-prod and tw-lake-dev. Under tw-lake-prod sit three datasets, sales_raw, sales_curated and loyalty_pii, and a bucket. A billing account box on the right is linked by dashed lines to all three projects. A thick arrow down the left side says policies set higher up flow down to everything below.">
+        <defs>
+          <filter id="a1aSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="11" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="a1aHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="a1aAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .a1aH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .a1aL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .a1aS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a1aW { font: 800 12px Inter, sans-serif; fill: #FFFFFF; }
+          .a1aA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .a1aN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="a1aH" x="30" y="26">TIDEWATER GROCERS (CONSTRUCTED): ONE ORGANIZATION, THREE FOLDERS, THREE PROJECTS</text>
+
+        <g filter="url(#a1aSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="250" y="44" width="220" height="36" rx="8" transform="rotate(-0.5 360 62)" fill="#174EA6" stroke="#174EA6"/>
+          <path d="M360 82 L360 98 M150 98 L570 98 M150 98 L150 112 M360 98 L360 112 M570 98 L570 112"/>
+          <rect x="80" y="114" width="140" height="32" rx="8" transform="rotate(0.6 150 130)" fill="#E8F0FE"/>
+          <rect x="290" y="114" width="140" height="32" rx="8" transform="rotate(-0.6 360 130)" fill="#E8F0FE"/>
+          <rect x="500" y="114" width="140" height="32" rx="8" transform="rotate(0.5 570 130)" fill="#E8F0FE"/>
+          <path d="M150 148 L150 170 M360 148 L360 170 M570 148 L570 170"/>
+          <rect x="80" y="172" width="140" height="34" rx="8" transform="rotate(-0.8 150 189)" fill="#FBBC04"/>
+          <rect x="290" y="172" width="140" height="34" rx="8" transform="rotate(0.7 360 189)" fill="#FFFFFF"/>
+          <rect x="500" y="172" width="140" height="34" rx="8" transform="rotate(-0.6 570 189)" fill="#FFFFFF"/>
+          <path d="M150 208 L150 226 M66 226 L236 226 M66 226 L66 238 M150 226 L150 238 M236 226 L236 238"/>
+          <rect x="36" y="240" width="64" height="44" rx="6" fill="url(#a1aHc)"/>
+          <rect x="118" y="240" width="64" height="44" rx="6" fill="url(#a1aHc)"/>
+          <rect x="204" y="240" width="64" height="44" rx="6" fill="url(#a1aHc)"/>
+          <rect x="700" y="160" width="150" height="58" rx="10" transform="rotate(0.8 775 189)" fill="#FFFFFF"/>
+          <path d="M642 189 L696 189" stroke-dasharray="5 5"/>
+          <path d="M432 210 C 520 262, 690 262, 740 222" stroke-dasharray="5 5"/>
+          <path d="M222 206 C 300 300, 700 300, 770 222" stroke-dasharray="5 5"/>
+          <path d="M14 60 L14 290" stroke="#1A73E8" stroke-width="4" marker-end="url(#a1aAr)"/>
+        </g>
+
+        <text class="a1aW" x="268" y="67">organization tidewater.example</text>
+        <text class="a1aL" x="96" y="135">data-platform</text>
+        <text class="a1aL" x="306" y="135">analytics</text>
+        <text class="a1aL" x="516" y="135">sandbox</text>
+        <text class="a1aH" x="96" y="194">tw-lake-prod</text>
+        <text class="a1aL" x="306" y="194">tw-bi-prod</text>
+        <text class="a1aL" x="516" y="194">tw-lake-dev</text>
+        <text class="a1aS" x="40" y="300">sales_raw</text>
+        <text class="a1aS" x="120" y="300">sales_curated</text>
+        <text class="a1aS" x="210" y="300">loyalty_pii</text>
+        <text class="a1aS" x="40" y="318">datasets and a bucket live inside the project</text>
+        <text class="a1aL" x="716" y="184">billing account</text>
+        <text class="a1aS" x="716" y="204">pays for 3 projects</text>
+        <text class="a1aA" x="26" y="52">policies flow down</text>
+
+        <text class="a1aN" x="30" y="358">The yellow project is the one these pages keep returning to: it holds the data, so it is where cost and access go wrong first.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - permissions and policies set on a box apply to every box below it; the bill attaches at the projects</figcaption>
+    </figure>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>Folders are for people, projects are for money and access<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Folders are optional and exist to group projects the way your organisation thinks: by department, by environment, by team. Projects are not optional: "You need a project resource to use Google Cloud." A project carries the link to one billing account, the list of enabled services, and the permissions that apply to everything inside it. Google's own phrasing is that allow, deny and organization policies "are inherited through the hierarchy", so a grant on a folder reaches every project below it.</p>
+        <p>The practical rule for a data leader: one project per environment per workload is a sane default, because the project is the smallest box you can budget and lock down as a whole. Tidewater, the constructed grocery chain on every page that follows, has three: the lake in production, the BI workloads, and a development sandbox.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Billing accounts sit beside the tree, not inside it<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A Cloud Billing account "defines who pays for a given set of Google Cloud resources", and one billing account can pay for many projects. The link is per project, which is why a cost report naturally breaks down by project and why mixing two teams' work in one project makes the bill hard to read. The BigQuery sandbox, used in the builder track, is the exception that proves the rule: a project with no billing account at all, and so with hard limits instead of a bill.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The single "data" project.</strong> A pattern repeated across many first cloud migrations: everything lands in one project because it is quicker. A year later the finance team cannot tell the BI dashboards' cost from the data science experiments, and the only way to give a contractor read access to one table is to hand-craft exceptions. Nothing was broken. The tree was never drawn. The story is a constructed composite of a common pattern.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers regions, zones, multi-regions and the services</span>
+      <h2>Where the bytes sit, and what reads them</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">Google's wording: "Regions are independent geographic areas that consist of zones", and a region has "three or more zones housed in three or more physical data centers". BigQuery adds two multi-regions, US and EU, and Cloud Storage offers a region, a dual-region or a multi-region for every bucket. For Tidewater, with stores in Singapore, Malaysia and Indonesia, the candidate regions are asia-southeast1 (Singapore), asia-southeast4 (Kuala Lumpur) and asia-southeast2 (Jakarta). The choice is made per dataset and per bucket, at creation.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Left: one region, asia-southeast1 Singapore, drawn as an outline holding three zones. A BigQuery dataset and a Cloud Storage bucket sit in the region. Right: four engine boxes that read the same stored data: BigQuery queries, Dataflow pipelines, Cloud Run functions and Vertex AI, now called Gemini Enterprise Agent Platform. A dashed ring labelled IAM surrounds everything; every request passes through it.">
+        <defs>
+          <filter id="a1bSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="23" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="a1bHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="a1bAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .a1bH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .a1bL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .a1bS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a1bA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .a1bN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#a1bSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="20" y="30" width="840" height="262" rx="22" stroke="#1A73E8" stroke-dasharray="8 6"/>
+          <rect x="44" y="60" width="380" height="210" rx="16" transform="rotate(-0.3 234 165)" fill="#FFFFFF"/>
+          <rect x="62" y="96" width="104" height="58" rx="8" transform="rotate(0.8 114 125)" fill="#E8F0FE"/>
+          <rect x="182" y="96" width="104" height="58" rx="8" transform="rotate(-0.8 234 125)" fill="#E8F0FE"/>
+          <rect x="302" y="96" width="104" height="58" rx="8" transform="rotate(0.6 354 125)" fill="#E8F0FE"/>
+          <rect x="62" y="180" width="164" height="70" rx="8" fill="url(#a1bHc)"/>
+          <rect x="242" y="180" width="164" height="70" rx="8" fill="url(#a1bHc)"/>
+          <rect x="500" y="60" width="160" height="50" rx="10" transform="rotate(-0.8 580 85)" fill="#FBBC04"/>
+          <rect x="680" y="60" width="160" height="50" rx="10" transform="rotate(0.7 760 85)" fill="#FFFFFF"/>
+          <rect x="500" y="140" width="160" height="50" rx="10" transform="rotate(0.6 580 165)" fill="#FFFFFF"/>
+          <rect x="680" y="140" width="160" height="50" rx="10" transform="rotate(-0.6 760 165)" fill="#FFFFFF"/>
+          <path d="M496 90 L432 190" marker-end="url(#a1bAr)"/>
+          <path d="M496 172 L432 212" marker-end="url(#a1bAr)"/>
+        </g>
+
+        <text class="a1bA" x="40" y="50">IAM: every request passes the gate</text>
+        <text class="a1bL" x="60" y="84">asia-southeast1 (Singapore), one region</text>
+        <text class="a1bL" x="78" y="122">zone a</text>
+        <text class="a1bL" x="198" y="122">zone b</text>
+        <text class="a1bL" x="318" y="122">zone c</text>
+        <text class="a1bS" x="78" y="140">data centre</text>
+        <text class="a1bS" x="198" y="140">data centre</text>
+        <text class="a1bS" x="318" y="140">data centre</text>
+        <text class="a1bL" x="76" y="210">BigQuery dataset</text>
+        <text class="a1bS" x="76" y="228">location set at creation</text>
+        <text class="a1bL" x="256" y="210">Cloud Storage bucket</text>
+        <text class="a1bS" x="256" y="228">region, dual or multi</text>
+        <text class="a1bL" x="516" y="84">BigQuery queries</text>
+        <text class="a1bL" x="516" y="100">bytes or slot-hours</text>
+        <text class="a1bL" x="696" y="84">Dataflow (Beam)</text>
+        <text class="a1bS" x="696" y="100">vCPU and memory time</text>
+        <text class="a1bL" x="516" y="164">Cloud Run functions</text>
+        <text class="a1bS" x="516" y="180">requests and seconds</text>
+        <text class="a1bL" x="696" y="164">Vertex AI</text>
+        <text class="a1bS" x="696" y="180">now Agent Platform</text>
+        <text class="a1bS" x="500" y="232">four engines, one copy of the data,</text>
+        <text class="a1bS" x="500" y="250">each billed on its own meter</text>
+
+        <text class="a1bN" x="30" y="316">Location is set when each dataset and bucket is created. Engines are chosen per workload, without moving data.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow engine is the one sessions 2 and 5 are built around: BigQuery, billed by the bytes it reads</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The AWS name map, in one table<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Many data teams arrive from AWS. The names below are the closest match for a data platform, not exact equivalents; the AWS side has its own course, <a href="https://phoebefu6.github.io/learn-aws-with-phoebe/">Learn AWS with Phoebe</a>.</p>
+        <table class="clean">
+          <tr><th>On AWS</th><th>Closest on Google Cloud</th><th>What changes</th></tr>
+          <tr><td>S3</td><td>Cloud Storage</td><td>Buckets and objects; storage classes Standard, Nearline, Coldline, Archive</td></tr>
+          <tr><td>Athena + Redshift</td><td>BigQuery</td><td>One service is both the query-the-files engine and the warehouse</td></tr>
+          <tr><td>Glue (jobs, crawlers, catalog)</td><td>Dataflow, Managed Service for Apache Spark (formerly Dataproc), Knowledge Catalog (formerly Dataplex)</td><td>Three products instead of one</td></tr>
+          <tr><td>Lambda</td><td>Cloud Run functions (formerly Cloud Functions)</td><td>Runs on Cloud Run infrastructure since the August 2024 rename</td></tr>
+          <tr><td>Bedrock</td><td>Vertex AI Model Garden (Vertex AI is now Gemini Enterprise Agent Platform)</td><td>Renamed April 2026; Model Garden kept its name</td></tr>
+        </table>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Five renames you will meet in older material<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Google renamed a lot recently, and older blogs, courses and exam guides still use the old names. Cloud Functions became Cloud Run functions on 22 August 2024. Vertex AI became Gemini Enterprise Agent Platform on 22 April 2026. Dataplex Universal Catalog became Knowledge Catalog on 10 April 2026, and Google notes that "The API, client library, CLI, and IAM names remain unchanged". Dataproc is now Managed Service for Apache Spark, and Cloud Composer is "evolving to become Managed Service for Apache Airflow"; neither page gives a date. These pages use the current name with the old one in brackets on first use, because the people in your meetings will use both.</p>
+      </div>
+    </details>
+  </section>
+
+  <section class="section" id="part-3">
+    <div class="section-kicker">
+      <span class="klabel">Part 3 · covers the meters, the sandbox and the free trial</span>
+      <h2>Storing is cheap, reading decides the bill</h2>
+      <span class="tag concept">4 min live</span>
+    </div>
+    <p class="lede">A data leader does not need to memorise prices. They need to know which meter a decision turns on. BigQuery bills storage and compute separately: storage per GiB per month, compute either by the bytes each query reads (on-demand) or by slot-hours (capacity). Storage is the quiet meter. The reading meter scales with how people work, which is why the same table can be cheap for one team and expensive for the next.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three hand-drawn meters. Bytes stored: BigQuery active logical storage costs 23.55 dollars per TiB per month in us-central1. Bytes read on demand: 6.25 dollars per TiB, the first TiB each month free. Slot-hours: Standard edition 0.04 dollars per slot-hour. Below, two bars compare one run of SELECT star on the 77 GiB Chicago taxi table, 0.4701 dollars, with one run that names three columns, 0.0280 dollars.">
+        <defs>
+          <filter id="a1cSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="37" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="a1cHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+        </defs>
+        <style>
+          .a1cH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .a1cL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .a1cS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a1cV { font: 800 17px Inter, sans-serif; fill: #174EA6; }
+          .a1cN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="a1cH" x="30" y="26">THREE BIGQUERY METERS, US-CENTRAL1, PRICING PAGE OF 3 NOVEMBER 2026</text>
+
+        <g filter="url(#a1cSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="150" cy="94" r="44" fill="#FFFFFF"/>
+          <circle cx="440" cy="94" r="44" fill="#FBBC04"/>
+          <circle cx="730" cy="94" r="44" fill="#FFFFFF"/>
+          <path d="M150 94 L176 72"/>
+          <path d="M440 94 L474 90"/>
+          <path d="M730 94 L750 62"/>
+          <rect x="40" y="214" width="760" height="24" rx="4" fill="url(#a1cHc)"/>
+          <rect x="40" y="252" width="45" height="24" rx="4" fill="#1A73E8" stroke="#1A73E8"/>
+        </g>
+
+        <text class="a1cL" x="150" y="160" text-anchor="middle">Bytes stored</text>
+        <text class="a1cS" x="150" y="176" text-anchor="middle">active logical $23.55 / TiB-month</text>
+        <text class="a1cL" x="440" y="160" text-anchor="middle">Bytes read (on-demand)</text>
+        <text class="a1cS" x="440" y="176" text-anchor="middle">$6.25 / TiB, first TiB a month free</text>
+        <text class="a1cL" x="730" y="160" text-anchor="middle">Slot-hours (capacity)</text>
+        <text class="a1cS" x="730" y="176" text-anchor="middle">Standard edition $0.04 / slot-hour</text>
+
+        <text class="a1cS" x="40" y="206">SELECT * on the Chicago taxi table: 77.03 GiB read</text>
+        <text class="a1cV" x="808" y="233">$0.4701</text>
+        <text class="a1cS" x="96" y="269">three named columns: 4.58 GiB read</text>
+        <text class="a1cV" x="330" y="270">$0.0280</text>
+
+        <text class="a1cN" x="30" y="296">One run each. A dashboard that reruns the first query 200 times a day turns it into $2,814.50 a month.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow meter is the one session 5 and the builder bench are built around</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Where the numbers come from<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>BigQuery charges on-demand queries "for the number of bytes processed by each query", at $6.25 per TiB in the pricing page's default table (us-central1, read on 3 November 2026), with the first TiB each month free. The bytes come from BigQuery's documented data type sizes: 8 logical bytes for a number or timestamp, 2 plus the text's length for a string, nothing for a NULL. The public Chicago taxi table has 23 columns; measured on 18,362 real trips and scaled to its 211,670,894 rows, reading every column is 77.03 GiB, and reading three columns is 4.58 GiB. A dashboard that reruns the wide query 200 times a day bills 451.32 TiB a month, $2,814.50 after the free TiB. Builder session 8 computes every one of these numbers live, and session 5 explains the rest of the bill. Prices change: re-verify before relying on them.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The sandbox and the free trial, as they stand today<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Two ways in cost nothing. The <strong>BigQuery sandbox</strong> works "without providing a credit card or creating a billing account", gives the same 1 TiB of query processing a month as the free tier, and a "lifetime limit of 10 GiB of storage" that "is not refunded upon data deletion"; its tables expire after 60 days, and it does not support streaming, DML statements or the Data Transfer Service. The <strong>Free Trial</strong> is "$300 Welcome credit to spend over 90 days", and for it "you must provide a credit card or other payment method". Nothing in the leader track needs either. The builder track uses the sandbox plus a laptop, and marks every step that needs a billing account. Terms like these change: re-check both pages before you plan a workshop around them.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The estimate that priced the cheap meter.</strong> A team sizes its warehouse by storage: a few terabytes at cents per gigabyte a month, and the estimate looks small. The first month's bill is many times larger, because a BI tool runs <code>SELECT *</code> on the widest tables every few minutes and every refresh reads every column. The storage estimate was right. It measured the wrong meter. The scenario is constructed; the prices and byte counts are the real ones above.</p>
+    </div>
+  </section>
+
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>Your hierarchy, on one sheet</h2>
+      <span class="tag demo">★ 22 min · everyone builds</span>
+    </div>
+    <p class="lede">No console and no account. A sheet of paper, the tree from Part 1, the engines from Part 2 and the meters from Part 3. You draw the organization, folders and projects your data work lives in today, or should live in, then mark for each project who pays, who owns it, and which meter it runs on. Session 6 turns this sheet into Tidewater's one-page platform, and yours.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A hand-drawn worksheet with columns folder, project, what lives in it, main meter, owner. Three rows are filled for the constructed Tidewater: data-platform, tw-lake-prod, raw and curated sales and loyalty data, bytes stored and bytes read, data platform lead; analytics, tw-bi-prod, dashboards and scheduled queries, bytes read, analytics lead; sandbox, tw-lake-dev, experiments, bytes read, empty owner cell. A yellow tab asks which project has no owner.">
+        <defs>
+          <filter id="a1dSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="41" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+        </defs>
+        <style>
+          .a1dH { font: 800 11px Inter, sans-serif; fill: #202124; letter-spacing: .04em; }
+          .a1dL { font: 600 11px Inter, sans-serif; fill: #202124; }
+          .a1dS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a1dN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#a1dSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="24" width="820" height="152" rx="8" transform="rotate(-0.3 440 100)" fill="#FFFFFF"/>
+          <path d="M30 56 L850 56"/>
+          <path d="M140 24 L140 176 M260 24 L260 176 M520 24 L520 176 M680 24 L680 176" stroke="#DADCE0"/>
+          <path d="M40 96 L840 96 M40 136 L840 136" stroke="#E8EAED"/>
+          <rect x="36" y="140" width="808" height="30" rx="4" fill="#E8F0FE" stroke="#E8F0FE"/>
+          <rect x="30" y="190" width="250" height="28" rx="6" transform="rotate(0.8 155 204)" fill="#FBBC04"/>
+        </g>
+
+        <text class="a1dH" x="44" y="45">FOLDER</text>
+        <text class="a1dH" x="152" y="45">PROJECT</text>
+        <text class="a1dH" x="272" y="45">WHAT LIVES IN IT</text>
+        <text class="a1dH" x="532" y="45">MAIN METER</text>
+        <text class="a1dH" x="692" y="45">OWNER</text>
+        <text class="a1dL" x="44" y="81">data-platform</text>
+        <text class="a1dS" x="152" y="81">tw-lake-prod</text>
+        <text class="a1dS" x="272" y="81">sales_raw, sales_curated, loyalty_pii</text>
+        <text class="a1dS" x="532" y="81">bytes stored, bytes read</text>
+        <text class="a1dS" x="692" y="81">data platform lead</text>
+        <text class="a1dL" x="44" y="121">analytics</text>
+        <text class="a1dS" x="152" y="121">tw-bi-prod</text>
+        <text class="a1dS" x="272" y="121">dashboards, scheduled queries</text>
+        <text class="a1dS" x="532" y="121">bytes read</text>
+        <text class="a1dS" x="692" y="121">analytics lead</text>
+        <text class="a1dL" x="44" y="160">sandbox</text>
+        <text class="a1dS" x="152" y="160">tw-lake-dev</text>
+        <text class="a1dS" x="272" y="160">experiments, contractors</text>
+        <text class="a1dS" x="532" y="160">bytes read</text>
+        <text class="a1dL" x="44" y="209">Which project has no owner?</text>
+
+        <text class="a1dN" x="300" y="209">Constructed rows. The empty owner cell is the finding.</text>
+        <text class="a1dN" x="30" y="240">Five columns, one row per project. Keep it to one page.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the rows are constructed for Tidewater; the five columns are the part to copy</figcaption>
+    </figure>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>Draw the root and the folders.</strong> One organization box. Under it, the folders your company would recognise: by environment, by department, or both. If you do not know whether your company has an organization resource, write "unknown, ask the platform team"; it changes what policies you can set later.</p>
+      </div>
+      <div class="step">
+        <p><strong>Put each data workload in a project.</strong> Where the raw and curated data live, where the dashboards run, where people experiment. One project per environment per workload is a good default. If two teams share one project today, draw it that way and circle it.</p>
+        <div class="prompt-box good"><span class="label">★ A finished row, in words</span>Folder:   data-platform
+Project:  tw-lake-prod
+Holds:    sales_raw, sales_curated, loyalty_pii datasets; the landing bucket
+Meter:    bytes stored (storage) and bytes read (every query against it)
+Owner:    data platform lead
+Pays:     the Tidewater billing account</div>
+      </div>
+      <div class="step">
+        <p><strong>Tag each project with its main meter.</strong> Bytes stored, bytes read, slot-hours, or compute seconds. Circle any project where the meter scales with how often people click rather than how much data exists: those are next month's surprise.</p>
+      </div>
+      <div class="step">
+        <p><strong>Name an owner for every project.</strong> The person who answers when the bill jumps or the access is wrong. An empty owner cell is the most useful thing on the sheet.</p>
+      </div>
+      <div class="step">
+        <p><strong>Write the one sentence.</strong> In your own numbers or the ones from tonight: what your widest table costs to read once, and what it costs the way your dashboards read it. Session 5 checks the sentence against the full bill.</p>
+        <div class="prompt-box good"><span class="label">★ The sentence, with tonight's numbers</span>SELECT * on the 77.03 GiB Chicago taxi table: $0.4701 a run.
+Three named columns from it: 4.58 GiB, $0.0280 a run.
+The wide query 200 times a day: $2,814.50 a month.
+(BigQuery on-demand, us-central1, pricing page of 3 November 2026)</div>
+      </div>
+    </div>
+
+    <div class="prompt-box bad"><span class="label">✗ The sketch that becomes a migration nobody can govern</span>one project called "data" for everyone
+grant Editor to the team so nobody is blocked
+we will sort out billing labels later</div>
+
+    <div class="callout tip">
+      <p><strong>Ask "which project?" before "which service?".</strong> When someone proposes a new data workload on Google Cloud, the first question is where it lives in the tree, because that one answer decides who pays, who inherits access to it, and which policies already apply before anyone writes a line of code.</p>
+    </div>
+  </section>
+
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 2</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li><strong>Find your organization and folders.</strong> Ask whoever administers Google Cloud whether an organization resource exists, and which folders sit under it. Add them to your sheet.</li>
+      <li><strong>Find the region.</strong> For your most important dataset, find its location. If the answer is a multi-region, note whether a residency rule applies to that data.</li>
+      <li><strong>Find the reading meter.</strong> Pick one dashboard on BigQuery and ask how often it refreshes and how many columns its query reads. You now have the number session 5 starts from.</li>
+      <li><strong>Bring the sheet.</strong> Session 2 fills in what lives inside the data project: datasets, tables, external tables and the bucket behind them.</li>
+    </ol>
+  </section>
+
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+    <p>Clear all three and leader session 1 gets stamped in your passport.</p>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">1 · Where do billing, permissions and enabled services all attach in Google Cloud?</p>
+      <button class="qopt" type="button">A · The organization, so every team shares one bill</button>
+      <button class="qopt" type="button">B · The project: Google calls it essential for enabling billing, managing collaborators and permissions</button>
+      <button class="qopt" type="button">C · The folder, because folders are required</button>
+      <button class="qopt" type="button">D · Each BigQuery dataset separately</button>
+      <p class="qwhy">Folders are optional groupings. The project links to one billing account, holds the enabled services, and carries permissions that apply to everything inside it, which makes it the natural unit to budget and own.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="3">
+      <p class="qtext">2 · Tidewater grants a role on the data-platform folder. Which resources does it reach?</p>
+      <button class="qopt" type="button">A · Only the folder itself</button>
+      <button class="qopt" type="button">B · Every project in the organization</button>
+      <button class="qopt" type="button">C · None until each project copies it</button>
+      <button class="qopt" type="button">D · Every project, dataset and bucket below that folder, because policies are inherited down the hierarchy</button>
+      <p class="qwhy">Google's wording is that allow, deny and organization policies "are inherited through the hierarchy". A folder grant reaches tw-lake-prod and everything in it, and nothing in the sibling folders.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">3 · <code>SELECT *</code> on the 77.03 GiB taxi table costs $0.4701 a run on demand; naming three columns costs $0.0280. What is the right reading?</p>
+      <button class="qopt" type="button">A · BigQuery bills the columns a query reads, so query habits move the bill far more than storage does</button>
+      <button class="qopt" type="button">B · BigQuery is overpriced for analytics</button>
+      <button class="qopt" type="button">C · The two numbers cannot both be right for one table</button>
+      <button class="qopt" type="button">D · Storage is the meter to watch</button>
+      <p class="qwhy">On-demand charges follow "the total data processed in the columns you select". The table is the same; the habit changes the bytes, and session 5 adds partitions and clusters that cut them further.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What this session teaches, and where it came from</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Organization, folders, projects; inheritance of policies</span><span class="note">Google Cloud resource hierarchy page, read at source on 3 November 2026</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Billing accounts linked to projects</span><span class="note">Cloud Billing concepts, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Regions, zones, multi-regions, bucket location types</span><span class="note">Geography and regions; BigQuery locations; Cloud Storage bucket locations, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Five renames and their dates</span><span class="note">Cloud Run functions blog (22 August 2024); Agent Platform release notes (22 April 2026); Knowledge Catalog intro (10 April 2026); Managed Spark and Composer pages. Re-verify the changelog before delivery</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">On-demand, storage and slot prices; data type sizes</span><span class="note">BigQuery pricing page (us-central1 default table) and data type sizes, read 3 November 2026; byte counts computed by the builder bench</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">The sandbox and the Free Trial</span><span class="note">BigQuery sandbox page; free cloud features page, read at source; terms change, re-check before a workshop</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">The AWS name map</span><span class="note">Product names read at source; the matching is ours, closest fit for a data platform</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Tidewater Grocers, the single-project and storage-estimate stories</span><span class="note">Constructed: a fictional company and composites of common patterns</span></div>
+    </div>
+    <p class="mono" style="margin-top:14px">Every fact on this page, and its verification tier, is recorded in the course's source map.</p>
+  </section>
+
+  <section class="cheat" id="cheatsheet">
+    <h3>Leader session 1 cheat sheet <span>· pin this</span></h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>The tree</b><span>Organization, optional folders, projects. Everything below inherits what is set above.</span></div>
+      <div class="cheat-item"><b>The project</b><span>Where billing, permissions and services meet. Budget and own it as one unit.</span></div>
+      <div class="cheat-item"><b>Location</b><span>Region (3+ zones), dual-region or multi-region, set when each dataset and bucket is created.</span></div>
+      <div class="cheat-item"><b>The engines</b><span>BigQuery, Dataflow, Cloud Run functions, Vertex AI (now Agent Platform), one copy of the data.</span></div>
+      <div class="cheat-item"><b>The meters</b><span>Bytes stored; bytes read ($6.25 per TiB on demand) or slot-hours; compute seconds.</span></div>
+      <div class="cheat-item"><b>The sentence</b><span>SELECT * on 77.03 GiB: $0.4701 a run. Three columns: $0.0280. Re-verify prices.</span></div>
+    </div>
+  </section>
+
+  <div class="callout next">
+    <span class="nx-pill">Next session</span>
+    <p>The data project gets real. BigQuery stores tables and also reads files sitting in Cloud Storage, so one service can be both the warehouse and the lake. Session 2 draws what that means: datasets, native and external tables, BigLake's access delegation, and why a serverless warehouse changes the shape of the team that runs it.</p>
+  </div>
+
+  <footer class="pagefoot">
+    <span>Leader session 1 of 6 · learn-gcp-with-phoebe · by Phoebe Fu &nbsp;·&nbsp; 📚 <a href="https://phoebefu6.github.io/learn-with-phoebe/">Learn with Phoebe ↗</a></span>
+    <span><a href="../index.html">← Course home</a> &nbsp;·&nbsp; <a href="a2-bigquery-is-the-warehouse-and-the-lake.html">Next: BigQuery is the warehouse and the lake →</a></span>
+  </footer>
+
+</main>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

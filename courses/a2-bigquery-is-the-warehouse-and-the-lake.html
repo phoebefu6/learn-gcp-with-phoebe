@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Leader session 2 of 6. BigQuery bills storage and compute apart, reads only the columns you name, and queries Parquet files in Cloud Storage through external and BigLake tables. Why that changes the shape of a data platform team.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="BigQuery is the warehouse and the lake - learn gcp with phoebe">
+<meta property="og:description" content="Leader session 2 of 6. Two meters, one storage layer, three ways to read the same Parquet files, and one gate instead of two with BigLake.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/courses/a2-bigquery-is-the-warehouse-and-the-lake.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BigQuery is the warehouse and the lake - learn gcp with phoebe">
+<meta name="twitter:description" content="Leader session 2 of 6. Storage and compute billed apart, external and BigLake tables, and the team a serverless warehouse needs.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Leader session 2 · BigQuery is the warehouse and the lake - learn gcp with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=2">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-gcp-with-phoebe</a> / Leader session 2 of 6</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn GCP with Phoebe · Leader track · Session 2 of 6</div>
+    <h1>BigQuery is the warehouse and <span class="accent">the lake</span></h1>
+    <p class="sub">On most clouds the warehouse and the lake are two products, two bills and two sets of permissions. On Google Cloud one service plays both parts: BigQuery stores tables, and it also reads Parquet files sitting in a Cloud Storage bucket. Tonight we take that apart: the two meters behind every BigQuery bill, the three ways to reach the same files, the one-gate model BigLake gives you, and what changes for the team that no longer has a cluster to run.</p>
+    <div class="chip-row">
+      <span class="chip level">🟢 Foundations</span>
+      <span class="chip audience">Data and AI leaders, managers, architects</span>
+      <span class="chip audience">No code, no account</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:4">3-18 · Two meters, the lake, the team</span>
+      <span class="a3" style="flex:5">18-40 · Build-along: native, external or BigLake</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where we start</h2>
+    </div>
+    <p class="lede">Session 1 put Tidewater's data in one project, tw-lake-prod. Tonight we open that project. Inside it sit BigQuery datasets that hold tables, and a bucket that holds files. The surprise for most leaders is how little separates the two: a BigQuery table can be data BigQuery stores itself, or a thin definition over files in the bucket. That one design choice decides how many copies of your data exist, how many permissions a reader needs, and which line of the bill grows when people get curious.</p>
+
+    <div class="legend">
+      <span class="pill">🎫 Clear all three quiz questions to stamp your passport</span>
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">★ Build-along = you make the artifact</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> A one-page classification of your own data, or Tidewater's, into native tables, external tables and BigLake tables, with a reason for each and a short list of who still needs direct access to the bucket. Plus one sentence for the next platform debate: BigQuery bills what it stores and what it reads as two separate meters, and reading three named columns of the 77.03 GiB taxi table bills 4.58 GiB.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers storage and compute billed apart, datasets and tables</span>
+      <h2>One storage layer, two meters</h2>
+      <span class="tag concept">6 min live</span>
+    </div>
+    <p class="lede">A BigQuery dataset is a container inside a project; tables live inside datasets. Underneath, BigQuery keeps the data in a columnar store and bills it on two meters that never touch each other. Storage is billed per GiB per month. Compute is billed either by the bytes each query processes (on-demand) or by slot-hours (capacity). The pricing page is explicit that "BigQuery uses a columnar data structure. You're charged according to the total data processed in the columns you select". So a query does not pay for the table. It pays for the columns it touches.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 396" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two meters above one storage layer. Left meter, storage, billed per GiB-month as active or long-term, logical or physical bytes, connects down to BigQuery storage in the constructed project tw-lake-prod. Right meter, compute, highlighted, billed by bytes processed on demand or by slot-hours on capacity, connects to a query. In the storage layer two datasets: sales_raw and sales_curated. The sales_curated table is drawn as 23 columns; the query reads 3 of them, and only those bytes are billed.">
+        <defs>
+          <filter id="a2aSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="52" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="a2aHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="a2aAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .a2aH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .a2aL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .a2aS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a2aA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .a2aN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="a2aH" x="30" y="26">TW-LAKE-PROD (CONSTRUCTED): ONE STORAGE LAYER UNDER TWO INDEPENDENT METERS</text>
+
+        <g filter="url(#a2aSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="60" y="48" width="300" height="74" rx="10" transform="rotate(-0.8 210 85)" fill="#FFFFFF"/>
+          <rect x="520" y="48" width="300" height="74" rx="10" transform="rotate(0.8 670 85)" fill="#FBBC04"/>
+          <path d="M210 124 L210 192" marker-end="url(#a2aAr)"/>
+          <path d="M670 124 C 670 180, 620 196, 620 244" marker-end="url(#a2aAr)"/>
+          <rect x="40" y="196" width="800" height="164" rx="14" transform="rotate(-0.2 440 278)" fill="#FFFFFF"/>
+          <rect x="60" y="250" width="220" height="70" rx="6" fill="url(#a2aHc)"/>
+          <rect x="330" y="250" width="460" height="70" rx="4" fill="url(#a2aHc)"/>
+          <rect x="350" y="250" width="20" height="70" fill="#174EA6" stroke="#174EA6"/>
+          <rect x="450" y="250" width="20" height="70" fill="#174EA6" stroke="#174EA6"/>
+          <rect x="610" y="250" width="20" height="70" fill="#174EA6" stroke="#174EA6"/>
+          <path d="M350 252 L350 318 M370 252 L370 318 M390 252 L390 318 M410 252 L410 318 M430 252 L430 318 M450 252 L450 318 M470 252 L470 318 M490 252 L490 318 M510 252 L510 318 M530 252 L530 318 M550 252 L550 318 M570 252 L570 318 M590 252 L590 318 M610 252 L610 318 M630 252 L630 318 M650 252 L650 318 M670 252 L670 318 M690 252 L690 318 M710 252 L710 318 M730 252 L730 318 M750 252 L750 318 M770 252 L770 318" stroke="#DADCE0" stroke-width="1.2"/>
+        </g>
+
+        <text class="a2aL" x="78" y="74">Storage meter</text>
+        <text class="a2aS" x="78" y="93">per GiB-month: active or long-term</text>
+        <text class="a2aS" x="78" y="110">logical or physical bytes</text>
+        <text class="a2aL" x="538" y="74">Compute meter</text>
+        <text class="a2aL" x="538" y="93">on-demand: bytes processed</text>
+        <text class="a2aL" x="538" y="110">capacity: slot-hours</text>
+        <text class="a2aA" x="406" y="90">billed apart</text>
+
+        <text class="a2aL" x="58" y="220">BigQuery storage in project tw-lake-prod</text>
+        <text class="a2aL" x="60" y="242">dataset sales_raw</text>
+        <text class="a2aL" x="330" y="242">dataset sales_curated (23 columns)</text>
+        <text class="a2aS" x="60" y="340">tables loaded from the bucket</text>
+        <text class="a2aS" x="330" y="340">the query reads 3 of 23 columns: only those bytes are billed</text>
+
+        <text class="a2aN" x="30" y="384">Storage grows with what you keep; compute grows with how people query. Datasets constructed, meters real.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow meter is the one that moves with behaviour: it bills the columns a query reads, not the table it names</figcaption>
+    </figure>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>Storage and compute are two bills<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>BigQuery's pricing page describes two compute models. On demand, "you are charged for the number of bytes processed by each query". On capacity, compute is "measured in slots (virtual CPUs) over time". Storage sits on its own line: active or long-term, and logical or physical bytes, depending on the billing model you pick for the dataset. Nothing on the storage line changes when people run more queries, and nothing on the compute line changes when you keep more history.</p>
+        <p>For a leader this is the most useful fact about BigQuery. A decision to keep ten years of sales history is a storage decision, and it is cheap: active logical storage in us-central1 works out at "$23.552" for one TiB for a full month (BigQuery pricing page, 3 November 2026; prices change, re-verify before you quote them). A decision to put a wide dashboard in front of two hundred store managers is a compute decision, and it is the one that surprises people. On the public Chicago taxi table, the builder bench measures <code>SELECT *</code> at 77.03 GiB per run and three named columns at 4.58 GiB. Session 5 turns those bytes into the full bill.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Long-term storage without moving anything<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>BigQuery lowers the storage price on its own. When a table is not modified "for 90 consecutive days", its price "drops by approximately 50%", and the pricing page adds that there is "no difference in performance, durability, or availability" between active and long-term storage. Nobody exports anything, nobody moves anything, and queries read it exactly as before.</p>
+        <p>The consequence for planning: an archive strategy that copies cold BigQuery tables out to cheaper files to save money is often solving a problem BigQuery already solved, and adds a second copy to govern. The clock resets when the data is modified, so a job that rewrites a whole table every night keeps all of it on the active price. Ask how your tables are written before you ask what they cost to keep.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The archive project that saved half of a small line.</strong> A team spends a quarter building a job that exports year-old sales partitions out of the warehouse into cheap files, to cut the storage bill. Then someone reads the pricing page: untouched tables had already dropped to roughly half price on their own, and the storage line was a small share of the bill to begin with. The compute line, driven by a dashboard reading every column, was untouched by the project. The story is a constructed composite; the 90-day rule and the price ratio are Google's.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers external tables, BigLake and Cloud Storage as the lake</span>
+      <h2>Three ways to reach the same files</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">Tidewater's point-of-sale files land in the bucket tw-lake-prod-landing as Parquet, one folder per day. BigQuery can reach them three ways. It can load them into a native table, which makes a second copy in BigQuery storage. It can define an external table: "External tables let you query structured data in external datastores." Or it can define a BigLake table, which does the same "with access delegation". The files are identical in all three cases. What changes is how many copies exist and how many doors a reader must pass.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="At the top, the constructed bucket tw-lake-prod-landing holds Parquet files in folders named dt equals a date. Three routes go down to three table types. Native table: a load job copies the files into BigQuery storage, and a reader needs only a BigQuery role. External table: reads the files in place, and the reader needs the table and read access to the bucket, two gates. BigLake table, highlighted: reads the files in place with access delegation, and the reader is granted only the table, one gate.">
+        <defs>
+          <filter id="a2bSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="63" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="a2bHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="a2bAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .a2bH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .a2bL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .a2bS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a2bA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .a2bB { font: 800 11px Inter, sans-serif; fill: #6B4A00; }
+          .a2bN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="a2bH" x="30" y="26">ONE SET OF PARQUET FILES, THREE TABLE TYPES (TIDEWATER, CONSTRUCTED)</text>
+
+        <g filter="url(#a2bSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="40" y="42" width="800" height="66" rx="12" transform="rotate(-0.3 440 75)" fill="#E8F0FE"/>
+          <rect x="590" y="54" width="230" height="42" rx="6" fill="url(#a2bHc)"/>
+          <path d="M160 112 L160 148" marker-end="url(#a2bAr)"/>
+          <path d="M440 112 L440 148" stroke-dasharray="5 5" marker-end="url(#a2bAr)"/>
+          <path d="M720 112 L720 148" stroke-dasharray="5 5" marker-end="url(#a2bAr)"/>
+          <rect x="40" y="152" width="240" height="112" rx="10" transform="rotate(-1 160 208)" fill="#FFFFFF"/>
+          <rect x="320" y="152" width="240" height="112" rx="10" transform="rotate(0.8 440 208)" fill="#FFFFFF"/>
+          <rect x="600" y="152" width="240" height="112" rx="10" transform="rotate(-0.7 720 208)" fill="#FBBC04"/>
+          <rect x="40" y="282" width="240" height="40" rx="8" transform="rotate(0.6 160 302)" fill="#FFFFFF"/>
+          <rect x="320" y="282" width="240" height="40" rx="8" transform="rotate(-0.6 440 302)" fill="#FFFFFF"/>
+          <rect x="600" y="282" width="240" height="40" rx="8" transform="rotate(0.5 720 302)" fill="#FFFFFF"/>
+        </g>
+
+        <text class="a2bL" x="58" y="70">bucket tw-lake-prod-landing</text>
+        <text class="a2bS" x="58" y="90">sales/dt=2026-10-31/ ... Parquet, one folder a day</text>
+        <text class="a2bA" x="168" y="136">load job</text>
+        <text class="a2bA" x="448" y="136">read in place</text>
+        <text class="a2bA" x="728" y="136">read in place</text>
+
+        <text class="a2bL" x="58" y="178">Native table</text>
+        <text class="a2bS" x="58" y="198">files copied into BigQuery</text>
+        <text class="a2bS" x="58" y="216">a second copy to keep in sync</text>
+        <text class="a2bS" x="58" y="234">billed as BigQuery storage</text>
+
+        <text class="a2bL" x="338" y="178">External table</text>
+        <text class="a2bS" x="338" y="198">no copy, files stay put</text>
+        <text class="a2bS" x="338" y="216">the reader needs the table</text>
+        <text class="a2bS" x="338" y="234">and read access to the bucket</text>
+
+        <text class="a2bL" x="618" y="178">BigLake table</text>
+        <text class="a2bL" x="618" y="198">no copy, files stay put</text>
+        <text class="a2bL" x="618" y="216">access delegation:</text>
+        <text class="a2bL" x="618" y="234">grant the table only</text>
+
+        <text class="a2bL" x="58" y="307">one gate: a BigQuery role</text>
+        <text class="a2bL" x="338" y="307">two gates: table and bucket</text>
+        <text class="a2bB" x="618" y="307">one gate: the table</text>
+
+        <text class="a2bN" x="30" y="350">Same files each time. The two-gate reading of external tables is derived from Google's wording.</text>
+        <text class="a2bN" x="30" y="368">Bucket, folders and grants are constructed for Tidewater.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow route is the one that lets you keep files in the lake and still grant access in one place</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>External or BigLake: one gate or two<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Google's introduction to external data sources puts the difference in one sentence: "Access delegation decouples access to the BigLake table from access to the underlying datastore." The BigLake page spells out the consequence: "you grant users access only to the BigLake table, not to the underlying datastore."</p>
+        <p>Read the other way round, that is the cost of a plain external table: without delegation, whoever queries it also needs to be able to read the files. That reading is ours, derived from Google's wording, but it matches what teams feel in practice. Every analyst who can query the external table can also open the bucket directly, outside any table definition, which is a second access path to govern. With BigLake, the bucket can stay closed to people and open only to the table.</p>
+        <table class="clean">
+          <tr><th>Table type</th><th>Copies of the data</th><th>What a reader is granted</th></tr>
+          <tr><td>Native</td><td>Two: the files and BigQuery storage</td><td>The BigQuery table or dataset</td></tr>
+          <tr><td>External</td><td>One: the files</td><td>The table, and read access to the files (derived)</td></tr>
+          <tr><td>BigLake</td><td>One: the files</td><td>The table only, through access delegation</td></tr>
+        </table>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Formats and the folder layout BigQuery understands<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The BigLake page lists the formats it supports: Avro, CSV, Delta Lake, Iceberg, JSON, ORC and Parquet. The same page says BigLake tables reach "Cloud Storage, Amazon S3, and Blob Storage", so the lake does not have to be on Google Cloud at all.</p>
+        <p>When files are laid out in folders named after a key, BigQuery can read the key from the path. Google's own example of the default layout is <code>gs://my_bucket/my_table/dt=2019-10-31/lang=en/my_filename</code>; for Tidewater that becomes <code>gs://tw-lake-prod-landing/sales/dt=2026-10-31/</code>. The hive partitioned data page names three modes for the keys: AUTO, where "Key names and types are automatically detected", STRINGS, and CUSTOM. A query that filters on <code>dt</code> then opens only the matching folders. Builder session 1 builds exactly this layout on a laptop and counts the files a filter opens.</p>
+        <p>Choosing between Delta Lake, Iceberg and plain Parquet is a lakehouse decision, and it has its own home: <a href="https://phoebefu6.github.io/learn-databricks-with-phoebe/">Learn Databricks with Phoebe</a>.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>Two copies of the same table.</strong> The landing files are loaded into a native table every night for speed. A year later an upstream fix rewrites three months of files in the bucket, nobody reloads, and the BI team and the data science team, one reading the native table and one the files, present different revenue to the same steering committee. Both numbers were correct for the copy they read. The story is a constructed composite of a common pattern; the question it teaches is "which copy is the truth, and who keeps the other in sync?"</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-3">
+    <div class="section-kicker">
+      <span class="klabel">Part 3 · covers why a serverless warehouse changes team shape</span>
+      <h2>No cluster to run, so the work moves</h2>
+      <span class="tag concept">4 min live</span>
+    </div>
+    <p class="lede">There is no BigQuery cluster for your team to size, patch or resize. You create datasets, load or point at data, and pay the two meters. That is an argument about people as much as technology: the hours a platform team used to spend keeping machines healthy do not disappear, they move to the meters and the gates. The argument below is constructed reasoning, not a Google claim, and it carries no numbers.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 316" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A before and after sketch of a platform team's work. Left panel, a warehouse with clusters: size and resize the cluster, patch and upgrade nodes, vacuum and rebalance storage, plan peak capacity. An arrow points right. Right panel, BigQuery: cost governance of bytes and slots, highlighted; access, who reads which table; data modelling and contracts; capacity as slots, only if you buy them. A note says the argument is constructed and carries no numbers.">
+        <defs>
+          <filter id="a2cSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="74" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <marker id="a2cAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .a2cH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .a2cL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .a2cS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a2cA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .a2cN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="a2cH" x="30" y="26">WHERE A PLATFORM TEAM'S HOURS GO, BEFORE AND AFTER (CONSTRUCTED ARGUMENT)</text>
+
+        <g filter="url(#a2cSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="40" y="44" width="380" height="220" rx="14" transform="rotate(-0.3 230 154)" fill="#E8F0FE"/>
+          <rect x="460" y="44" width="380" height="220" rx="14" transform="rotate(0.3 650 154)" fill="#FFFFFF"/>
+          <rect x="60" y="82" width="340" height="34" rx="7" transform="rotate(-1.2 230 99)" fill="#FFFFFF"/>
+          <rect x="60" y="126" width="340" height="34" rx="7" transform="rotate(0.9 230 143)" fill="#FFFFFF"/>
+          <rect x="60" y="170" width="340" height="34" rx="7" transform="rotate(-0.8 230 187)" fill="#FFFFFF"/>
+          <rect x="60" y="214" width="340" height="34" rx="7" transform="rotate(1 230 231)" fill="#FFFFFF"/>
+          <rect x="480" y="82" width="340" height="34" rx="7" transform="rotate(1 650 99)" fill="#FBBC04"/>
+          <rect x="480" y="126" width="340" height="34" rx="7" transform="rotate(-0.9 650 143)" fill="#E8F0FE"/>
+          <rect x="480" y="170" width="340" height="34" rx="7" transform="rotate(0.8 650 187)" fill="#E8F0FE"/>
+          <rect x="480" y="214" width="340" height="34" rx="7" transform="rotate(-1 650 231)" fill="#E8F0FE"/>
+          <path d="M424 154 L454 154" stroke-width="3" marker-end="url(#a2cAr)"/>
+        </g>
+
+        <text class="a2cL" x="58" y="68">Before: a warehouse with clusters</text>
+        <text class="a2cL" x="478" y="68">After: BigQuery, no cluster to run</text>
+        <text class="a2cS" x="76" y="104">size and resize the cluster</text>
+        <text class="a2cS" x="76" y="148">patch and upgrade the nodes</text>
+        <text class="a2cS" x="76" y="192">vacuum and rebalance storage</text>
+        <text class="a2cS" x="76" y="236">plan for the peak, pay for it all month</text>
+        <text class="a2cL" x="496" y="104">cost governance: bytes read, slots</text>
+        <text class="a2cL" x="496" y="148">access: who reads which table</text>
+        <text class="a2cL" x="496" y="192">data modelling and data contracts</text>
+        <text class="a2cL" x="496" y="236">capacity as slots, only if you buy them</text>
+
+        <text class="a2cN" x="30" y="290">Constructed argument, no numbers. The work does not vanish: it moves from machines to money and access.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow job is the one nobody owned before: someone has to watch the reading meter</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>What the platform team stops doing, and starts doing<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Constructed reasoning, for discussion. When there is no cluster, the classic database-administration work of sizing, patching and rebalancing has no object. Three jobs grow in its place. First, cost governance: on-demand billing turns every analyst's query habit into a line on the bill, so somebody must own the reading meter, set guardrails and teach people to name columns. Second, access: with tables over files, the question "who can read the bucket, and who can only read the table?" becomes a design decision, not an afterthought. Third, modelling and contracts: when anyone can create a table in minutes, the hard part is agreeing which table is the truth.</p>
+        <p>The leadership move is to name an owner for each of the three before the migration, not after the first surprising invoice. Sessions 3 and 5 give the owners their tools: IAM down the hierarchy, and the full anatomy of the bill.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Where BigQuery is not the answer<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>BigQuery is an analytical store: it is built to read many rows and few columns. It is not the place for an application's transactions, where each request writes or reads one row and must answer in milliseconds. Google Cloud has other products for those shapes; Bigtable and Spanner are the names you will hear, and these pages do not teach them. If a proposal puts a checkout system or a per-customer lookup API directly on BigQuery, ask what the read pattern is before anything else.</p>
+        <p>Two neighbouring topics have their own homes. How to model a warehouse (facts, dimensions, slowly changing history) is in <a href="https://phoebefu6.github.io/learn-data-warehouse-with-phoebe/">Learn Data Warehouse with Phoebe</a>. Open table formats and the lakehouse pattern are in <a href="https://phoebefu6.github.io/learn-databricks-with-phoebe/">Learn Databricks with Phoebe</a>. What stays here is what is specific to BigQuery: the meters, the table types and the gates.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The administrator who became the cost owner.</strong> A retailer moves its warehouse to a serverless service and plans to let its database administrator go, since there is nothing left to administer. Three months later the same person is back in a new role: reading the query logs, finding the dashboard that reads every column every few minutes, and teaching analysts to name what they need. The skills transferred; the object changed. The story is a constructed composite.</p>
+    </div>
+  </section>
+
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>Native, external or BigLake: classify Tidewater's data</h2>
+      <span class="tag demo">★ 22 min · everyone builds</span>
+    </div>
+    <p class="lede">Paper only. Take Tidewater's data, constructed for these pages: the landing files in tw-lake-prod-landing, and the datasets sales_raw, sales_curated and loyalty_pii in tw-lake-prod. For each one decide whether it should be a native table, an external table or a BigLake table, write the reason in one line, and list who still needs to read the bucket directly. Then do the same for three datasets of your own.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 262" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A hand-drawn worksheet with five columns: data, where it sits, table type, who needs the bucket, why. The first row is worked for the constructed Tidewater: sales_raw, Parquet files in the landing bucket, BigLake table, no person, read in place with one gate. The rows for sales_curated and loyalty_pii are left blank for you. A yellow tab asks which rows need bucket access at all.">
+        <defs>
+          <filter id="a2dSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="85" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+        </defs>
+        <style>
+          .a2dH { font: 800 11px Inter, sans-serif; fill: #202124; letter-spacing: .04em; }
+          .a2dL { font: 600 11px Inter, sans-serif; fill: #202124; }
+          .a2dS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a2dN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#a2dSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="24" width="820" height="152" rx="8" transform="rotate(-0.3 440 100)" fill="#FFFFFF"/>
+          <path d="M30 56 L850 56"/>
+          <path d="M160 24 L160 176 M300 24 L300 176 M440 24 L440 176 M640 24 L640 176" stroke="#DADCE0"/>
+          <path d="M40 96 L840 96 M40 136 L840 136" stroke="#E8EAED"/>
+          <rect x="36" y="60" width="808" height="32" rx="4" fill="#E8F0FE" stroke="#E8F0FE"/>
+          <rect x="30" y="192" width="290" height="28" rx="6" transform="rotate(0.8 175 206)" fill="#FBBC04"/>
+        </g>
+
+        <text class="a2dH" x="44" y="45">DATA</text>
+        <text class="a2dH" x="172" y="45">WHERE IT SITS</text>
+        <text class="a2dH" x="312" y="45">TABLE TYPE</text>
+        <text class="a2dH" x="452" y="45">WHO NEEDS THE BUCKET</text>
+        <text class="a2dH" x="652" y="45">WHY</text>
+        <text class="a2dL" x="44" y="81">sales_raw</text>
+        <text class="a2dS" x="172" y="81">landing Parquet</text>
+        <text class="a2dL" x="312" y="81">BigLake table</text>
+        <text class="a2dS" x="452" y="81">no person</text>
+        <text class="a2dS" x="652" y="81">read in place, one gate</text>
+        <text class="a2dL" x="44" y="121">sales_curated</text>
+        <text class="a2dS" x="172" y="121">?</text>
+        <text class="a2dS" x="312" y="121">?</text>
+        <text class="a2dS" x="452" y="121">?</text>
+        <text class="a2dS" x="652" y="121">?</text>
+        <text class="a2dL" x="44" y="160">loyalty_pii</text>
+        <text class="a2dS" x="172" y="160">?</text>
+        <text class="a2dS" x="312" y="160">?</text>
+        <text class="a2dS" x="452" y="160">?</text>
+        <text class="a2dS" x="652" y="160">?</text>
+        <text class="a2dL" x="44" y="211">Which rows need bucket access at all?</text>
+
+        <text class="a2dN" x="338" y="211">Tidewater rows are constructed. The tinted row is worked.</text>
+        <text class="a2dN" x="30" y="248">Five columns, one row per dataset or file set. A short "who needs the bucket" column is the goal.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the first row is worked for you; the empty cells are tonight's exercise</figcaption>
+    </figure>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>List what exists.</strong> Write one row per dataset or set of files: where it physically sits (BigQuery storage or a bucket path), and its format if it is files. For Tidewater: the landing files, sales_raw, sales_curated, loyalty_pii.</p>
+      </div>
+      <div class="step">
+        <p><strong>Work the first row together.</strong> sales_raw is the landing files as they arrived. Nobody edits them, many people read them, and nobody should need the bucket to do so.</p>
+        <div class="prompt-box good"><span class="label">★ Worked example: sales_raw</span>Data:         sales_raw
+Sits in:      gs://tw-lake-prod-landing/sales/dt=.../ (Parquet)
+Table type:   BigLake table over the files
+Bucket:       no person needs to read it directly
+Why:          one copy, read in place; access delegation means
+              "you grant users access only to the BigLake table"</div>
+      </div>
+      <div class="step">
+        <p><strong>Classify the other two.</strong> sales_curated is the cleaned, modelled table every dashboard reads; loyalty_pii holds member details. Decide the type for each and, more importantly, who must touch the bucket. A native table is a perfectly good answer when the data is produced inside BigQuery and read constantly; a copy is only a problem when it has a twin elsewhere.</p>
+        <div class="prompt-box good"><span class="label">★ One defensible answer for sales_curated</span>Data:         sales_curated
+Sits in:      BigQuery storage, written by a scheduled SQL job
+Table type:   native table
+Bucket:       nobody; the data never lived in the bucket
+Why:          produced inside BigQuery, read by every dashboard,
+              no second copy anywhere to drift</div>
+      </div>
+      <div class="step">
+        <p><strong>Shorten the bucket column.</strong> Look down "who needs the bucket". Every person on that list is a second path to the data that bypasses the table. For each name, ask whether a BigLake table would remove them. The ideal list holds the pipeline's service account and nobody else.</p>
+      </div>
+      <div class="step">
+        <p><strong>Repeat for three of your own datasets.</strong> Use your company's names. Circle any data that exists twice, once as files and once loaded, and write who keeps the two in sync. If the answer is "nobody", that is the finding to take back to your team.</p>
+      </div>
+    </div>
+
+    <div class="prompt-box bad"><span class="label">✗ The classification that doubles everything</span>load every file into a native table "for speed", keep the files too
+grant the whole analytics group Storage Object Viewer on the bucket
+"we will decide which copy is the truth later"</div>
+
+    <div class="callout tip">
+      <p><strong>Count the gates before the copies.</strong> When someone proposes a new table over lake files, ask two questions in order: how many places will a reader be granted access, and how many copies of the data will exist? One and one is the target. Each extra answer is something a person must keep in sync by hand.</p>
+    </div>
+  </section>
+
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 3</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li><strong>Find one external table.</strong> Ask your data team whether any BigQuery table reads files in a bucket. If so, find out whether it is an external table or a BigLake table, and who can read the bucket underneath.</li>
+      <li><strong>Find the twins.</strong> Name one dataset that exists both as files and as a loaded table. Write down who reloads it when the files change.</li>
+      <li><strong>Read the storage line.</strong> On your last BigQuery invoice or billing report, find storage and compute as separate lines. Note which is larger. For most teams it is compute.</li>
+      <li><strong>Name the three owners.</strong> Write a name next to cost governance, access, and modelling for your BigQuery estate. Bring the sheet: session 3 draws who is allowed in, and at which level of the tree.</li>
+    </ol>
+  </section>
+
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+    <p>Clear all three and leader session 2 gets stamped in your passport.</p>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">1 · Tidewater turns an external table over its landing files into a BigLake table. What changes for an analyst like mei?</p>
+      <button class="qopt" type="button">A · The files are copied into BigQuery storage, so queries get faster</button>
+      <button class="qopt" type="button">B · Nothing: both table types need the same grants</button>
+      <button class="qopt" type="button">C · She can be granted the table alone, without any access to the bucket underneath</button>
+      <button class="qopt" type="button">D · She now needs read access to the bucket as well as the table</button>
+      <p class="qwhy">With access delegation, "you grant users access only to the BigLake table, not to the underlying datastore." The files stay where they are; the second gate goes away.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">2 · On the Chicago taxi table, <code>SELECT *</code> processes 77.03 GiB and three named columns process 4.58 GiB. Why the difference on demand?</p>
+      <button class="qopt" type="button">A · The narrow query reads fewer rows</button>
+      <button class="qopt" type="button">B · BigQuery stores data by column and bills the data processed in the columns a query selects</button>
+      <button class="qopt" type="button">C · The wide query was charged for storage as well as compute</button>
+      <button class="qopt" type="button">D · On-demand pricing gives a discount to short queries</button>
+      <p class="qwhy">Both queries read all 211,670,894 rows. "You're charged according to the total data processed in the columns you select", so dropping 20 of 23 columns drops most of the bytes.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="3">
+      <p class="qtext">3 · When does a BigQuery table move to the long-term storage price?</p>
+      <button class="qopt" type="button">A · When you export it to a Coldline bucket</button>
+      <button class="qopt" type="button">B · After 30 days, whether or not it changes</button>
+      <button class="qopt" type="button">C · When you mark the dataset as archived, which slows queries</button>
+      <button class="qopt" type="button">D · When it has not been modified for 90 consecutive days, with no change in performance</button>
+      <p class="qwhy">Not modified "for 90 consecutive days", and the price "drops by approximately 50%", with "no difference in performance, durability, or availability". Nothing is moved and nothing is exported.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What this session teaches, and where it came from</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">On-demand bytes, capacity slots, storage billed separately; columnar billing; long-term storage</span><span class="note">BigQuery pricing page, us-central1 default table, read 3 November 2026; prices change, re-verify</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">External tables and access delegation</span><span class="note">Introduction to external data sources, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">BigLake tables, formats, "access only to the BigLake table"</span><span class="note">Introduction to BigLake tables, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Hive layout example and key modes</span><span class="note">Manage external Hive partitioned data, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">77.03 GiB and 4.58 GiB on the taxi table</span><span class="note">Computed by the builder bench from BigQuery's data type sizes and the City of Chicago portal's row count</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">External tables need bucket access too (two gates)</span><span class="note">Derived from Google's access delegation wording, not a Google sentence</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Tidewater Grocers, the team-shape argument and the three stories</span><span class="note">Constructed: a fictional company, a reasoned argument and composites of common patterns</span></div>
+    </div>
+    <p class="mono" style="margin-top:14px">Every fact on this page, and its verification tier, is recorded in the course's source map.</p>
+  </section>
+
+  <section class="cheat" id="cheatsheet">
+    <h3>Leader session 2 cheat sheet <span>· pin this</span></h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>Two meters</b><span>Storage per GiB-month; compute by bytes processed (on-demand) or slot-hours (capacity).</span></div>
+      <div class="cheat-item"><b>Columns, not tables</b><span>On demand you pay for the columns a query reads. 77.03 GiB vs 4.58 GiB on one table.</span></div>
+      <div class="cheat-item"><b>Long-term storage</b><span>Unmodified 90 consecutive days: about 50% cheaper, same performance, nothing moved.</span></div>
+      <div class="cheat-item"><b>Native table</b><span>Loaded copy in BigQuery storage. Fine when produced in BigQuery; a risk when it has a twin.</span></div>
+      <div class="cheat-item"><b>External vs BigLake</b><span>Both read files in place. BigLake delegates access: grant the table, not the bucket.</span></div>
+      <div class="cheat-item"><b>The team shift</b><span>No cluster to run. Name owners for cost, access and modelling before you migrate.</span></div>
+    </div>
+  </section>
+
+  <div class="callout next">
+    <span class="nx-pill">Next session</span>
+    <p>Tonight ended on a list of who needs the bucket. Session 3 asks the general question: who gets in, and at which level of the tree. Allow policies inherited from the organization down to a single table, why a grant can only add and never subtract, and the three kinds of role, from the basic ones Google warns against to the custom ones you write yourself.</p>
+  </div>
+
+  <footer class="pagefoot">
+    <span>Leader session 2 of 6 · learn-gcp-with-phoebe · by Phoebe Fu &nbsp;·&nbsp; 📚 <a href="https://phoebefu6.github.io/learn-with-phoebe/">Learn with Phoebe ↗</a></span>
+    <span><a href="a1-what-gcp-is-to-a-data-team.html">← Prev: What GCP is to a data team</a> &nbsp;·&nbsp; <a href="a3-who-gets-in-at-which-level.html">Next: Who gets in, at which level →</a></span>
+  </footer>
+
+</main>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

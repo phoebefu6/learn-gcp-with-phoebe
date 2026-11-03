@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Builder session 6 of 8. Cloud Run services, jobs and functions, when an ingest step should be a function and when a container, how a file landing in a bucket reaches your code, and an ingest function run on your laptop with the functions framework.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="Cloud Run or a function - learn gcp with phoebe">
+<meta property="og:description" content="Builder session 6 of 8. One ingest handler on a laptop: a hive-style path is accepted into a day partition, a loose CSV is refused with HTTP 400.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/courses/b6-cloud-run-or-a-function.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Cloud Run or a function - learn gcp with phoebe">
+<meta name="twitter:description" content="Builder session 6 of 8. Services, jobs, functions, triggers and the free tier, with an ingest function on a laptop.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Builder session 6 · Cloud Run or a function - learn gcp with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=2">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-gcp-with-phoebe</a> / Builder session 6 of 8</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn GCP with Phoebe · Builder track · Session 6 of 8</div>
+    <h1>Cloud Run or <span class="accent">a function</span></h1>
+    <p class="sub">Between a file landing in a bucket and a row in BigQuery there is usually a small piece of code: check the name, pick the table, start the load. On Google Cloud that code runs on Cloud Run, as a service, a job or a function. Tonight you learn which shape fits which work, how the landing event reaches your code, and you run Tidewater's ingest handler on your laptop, feeding it one good path and one bad one.</p>
+    <div class="chip-row">
+      <span class="chip level">🟠 Applied</span>
+      <span class="chip audience">Data engineers, analytics engineers, analysts who code</span>
+      <span class="chip audience">Python on a laptop, no account</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:4">3-18 · Services, jobs, functions, triggers</span>
+      <span class="a3" style="flex:5">18-40 · Build-along: an ingest function on your laptop</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where we start</h2>
+    </div>
+    <p class="lede">Session 1 laid out the landing bucket with hive-style names, <code>sales/dt=2026-11-01/part-0.parquet</code>. Session 5 showed the heavy option for moving data, a Beam pipeline on Dataflow. Most ingest steps are much smaller than that: one file arrives, one decision is made, one load starts. This session is about the small option. Everything runs on your laptop with Google's open-source functions framework; deploying is shown, not run, because it needs a billing-enabled project.</p>
+
+    <div class="legend">
+      <span class="pill">🎫 Clear all three quiz questions to stamp your passport</span>
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">★ Build-along = you make the artifact</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> A working <code>main.py</code> that accepts <code>sales/dt=2026-11-01/part-0.parquet</code> and names its target as <code>tw-lake-prod.sales_raw.orders$20261101</code>, and refuses <code>sales/2026-11-01.csv</code> with HTTP 400, plus a one-line rule for choosing between a function, a service and a job.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers services, jobs and functions on Cloud Run</span>
+      <h2>One platform, three shapes of work</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">Google's What is Cloud Run page puts it in one line: "On Cloud Run, your code can run as a service, job, worker pool, or instance." Functions live there too. On 22 August 2024 Google announced that "Cloud Functions and its familiar event-driven programming model is now Cloud Run functions", adding "This goes beyond a simple name change. We've unified the Cloud Functions infrastructure with Cloud Run". So Cloud Run functions (formerly Cloud Functions) is not a separate product any more; it is the smallest shape on the same platform.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="One Cloud Run panel holding three shapes. A service handles requests or events, with a request timeout of 5 minutes by default, extendable up to 60 minutes. A job runs tasks and then stops, with a task timeout of 10 minutes by default, up to 168 hours, which is 7 days. Functions are event-driven handlers, formerly Cloud Functions, renamed on 22 August 2024.">
+        <defs>
+          <filter id="b6aSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="71" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b6aHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="b6aAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b6aH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b6aL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b6aS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b6aA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b6aN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#b6aSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="44" width="820" height="196" rx="14" transform="rotate(-0.3 440 142)" fill="#FFFFFF"/>
+          <rect x="50" y="86" width="250" height="130" rx="10" transform="rotate(-1.5 175 151)" fill="#E8F0FE"/>
+          <rect x="320" y="86" width="250" height="130" rx="10" transform="rotate(1.2 445 151)" fill="#E8F0FE"/>
+          <rect x="590" y="86" width="240" height="130" rx="10" transform="rotate(-1 710 151)" fill="#FBBC04"/>
+        </g>
+
+        <text class="b6aH" x="46" y="70">CLOUD RUN: THE SAME PLATFORM UNDER ALL THREE</text>
+        <text class="b6aL" x="66" y="114">Service</text>
+        <text class="b6aS" x="66" y="134">handles requests or events</text>
+        <text class="b6aA" x="66" y="164">request timeout: 5 min default</text>
+        <text class="b6aA" x="66" y="184">up to 60 minutes</text>
+        <text class="b6aL" x="336" y="114">Job</text>
+        <text class="b6aS" x="336" y="134">runs its tasks, then stops</text>
+        <text class="b6aA" x="336" y="164">task timeout: 10 min default</text>
+        <text class="b6aA" x="336" y="184">up to 168 hours (7 days)</text>
+        <text class="b6aL" x="606" y="114">Functions</text>
+        <text class="b6aL" x="606" y="134">event-driven handlers</text>
+        <text class="b6aL" x="606" y="164">formerly Cloud Functions</text>
+        <text class="b6aL" x="606" y="184">renamed 22 August 2024</text>
+
+        <text class="b6aS" x="30" y="262">Also on Cloud Run, not taught here: worker pools and instances.</text>
+        <text class="b6aN" x="30" y="286">Timeouts: Cloud Run request-timeout and task-timeout pages, read 3 November 2026.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow box is the old Cloud Functions, now one shape inside Cloud Run</figcaption>
+    </figure>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>Service, job, function: what each is for<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>Service.</strong> "Cloud Run services are great for code that handles requests, events, or functions." A service waits for traffic. Each request has a deadline: "The timeout is set by default to 5 minutes (300 seconds) and can be extended up to 60 minutes (3600 seconds)."</p>
+        <p><strong>Job.</strong> "A job can start a single instance to run your code", and the instance stops when the work is done. "By default, each task runs for a maximum of 10 minutes", and a task can be allowed "up to 168 hours (7 days)". A nightly backfill that runs for two hours is a job, not a service.</p>
+        <p><strong>Function.</strong> "Cloud Run functions can respond to asynchronous events, such as a message on a Pub/Sub topic, a change in a Cloud Storage bucket, or a Firebase event." You write one handler; the platform does the rest.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>What the rename did not break<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The rename post is explicit about continuity: "we are committed to continuing support for the existing functions APIs, gcloud commands and Terraform modules." That is why the deploy box at the end of the build-along still shows <code>gcloud functions deploy</code> next to <code>gcloud run deploy</code>. When you read older guides, blog posts or exam material that say "Cloud Functions", read it as Cloud Run functions; the event-driven model is the same, the infrastructure underneath is Cloud Run's.</p>
+        <p>If your team manages Cloud Run in code, that belongs to <a href="https://phoebefu6.github.io/learn-terraform-with-phoebe/courses/04-modules-and-versions.html">learn-terraform, session 4</a>; these pages use the console and gcloud.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The export that kept dying at the hour.</strong> A team runs a nightly export as a Cloud Run service behind a scheduler call. It works for months, then the data grows and the request starts failing at the deadline. Raising the timeout buys a few weeks; the ceiling is 60 minutes. Moving the export to a job, whose tasks can run for hours, ends it. The story is a constructed composite; the numbers are Google's documented limits.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers container or function for ingest</span>
+      <h2>How much of the container do you want to own?</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">Every shape on Cloud Run ends up as a container. The question is who writes it. With a function you hand over a few files of source code and a stock language runtime; with a service or job you write the Dockerfile and own everything in the image. For an ingest step that checks a file name and starts a load, a function is usually enough. The moment you need a system library, several endpoints, or hours of work, the container earns its keep.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A decision. The question at the top: one event in, one small handler out? Yes leads to a function on Cloud Run: one small handler per event, a stock language runtime is enough, a few files of source code; tonight's ingest handler sits here. No leads to a container you write, as a service or a job: custom system libraries in the image, several endpoints in one app, long work as a job task up to 168 hours, and you write the Dockerfile.">
+        <defs>
+          <filter id="b6bSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="73" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b6bHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="b6bAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b6bH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b6bL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b6bS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b6bA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b6bN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#b6bSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="280" y="40" width="320" height="50" rx="10" transform="rotate(-0.8 440 65)" fill="#FFFFFF"/>
+          <rect x="30" y="128" width="390" height="152" rx="10" transform="rotate(-0.4 225 204)" fill="#FFFFFF"/>
+          <rect x="46" y="238" width="250" height="28" rx="6" fill="#FBBC04"/>
+          <rect x="460" y="128" width="390" height="152" rx="10" transform="rotate(0.4 655 204)" fill="#E8F0FE"/>
+          <path d="M370 94 L232 122" marker-end="url(#b6bAr)"/>
+          <path d="M510 94 L648 122" marker-end="url(#b6bAr)"/>
+        </g>
+
+        <text class="b6bL" x="300" y="70">One event in, one small handler out?</text>
+        <text class="b6bA" x="250" y="102">yes</text>
+        <text class="b6bA" x="610" y="102">no</text>
+        <text class="b6bH" x="46" y="154">A FUNCTION ON CLOUD RUN</text>
+        <text class="b6bL" x="46" y="180">one small handler per event</text>
+        <text class="b6bL" x="46" y="202">a stock language runtime is enough</text>
+        <text class="b6bS" x="46" y="224">you ship a few files of source code</text>
+        <text class="b6bL" x="58" y="257">tonight's ingest handler</text>
+        <text class="b6bH" x="476" y="154">A CONTAINER YOU WRITE: SERVICE OR JOB</text>
+        <text class="b6bL" x="476" y="180">custom system libraries in the image</text>
+        <text class="b6bL" x="476" y="202">several endpoints in one app</text>
+        <text class="b6bL" x="476" y="224">long work: a job task, up to 168 hours</text>
+        <text class="b6bS" x="476" y="250">you write the Dockerfile (shown below)</text>
+
+        <text class="b6bN" x="30" y="306">Both run on Cloud Run; the choice is how much of the container you want to own.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - tonight's handler is one event in, one decision out, so it sits on the function side</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Three signals that you have outgrown a function<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>You need something the stock runtime does not have</strong>, a system library or a binary tool: write the image yourself. <strong>You need several routes in one app</strong>, an API rather than a single handler: that is a service. <strong>The work outlasts a request</strong>: anything that can run past the service ceiling of 60 minutes belongs in a job, whose tasks can run up to 168 hours.</p>
+        <p>None of the three applies to tonight's handler. It reads two fields, checks one regular expression and returns a decision, so it stays a function.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The same handler as a container, shown, not run here<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>If you outgrow the function, the code does not have to change: the functions framework runs inside your own image too. A minimal Dockerfile for tonight's <code>main.py</code> looks like this. It is shown, not run here: Docker was not installed on the laptop these pages were built on, so this file has not been built or tested. The <code>$PORT</code> in the last line reads the port from the environment instead of hard-coding 8080.</p>
+        <div class="prompt-box good"><span class="label">★ Shown, not run here · Dockerfile</span>FROM python:3.11-slim
+WORKDIR /app
+RUN pip install functions-framework==3.10.2
+COPY main.py .
+CMD functions-framework --target=ingest --port=$PORT</div>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The function that needed one more library.</strong> Tidewater's supplier invoices arrive as PDFs (constructed). The first version is a function that only moves files. Then finance wants the totals read out of each PDF, which needs a system tool the stock runtime does not ship. Raj moves the same handler into a container he writes, deployed as a service. The trigger, the bucket and the table stay the same; only the packaging changes.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-3">
+    <div class="section-kicker">
+      <span class="klabel">Part 3 · covers triggers and the free tier</span>
+      <h2>From a landed file to a loaded partition</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">A function does nothing until something calls it. For ingest, the caller is an event: an object lands in the landing bucket, a message reaches Pub/Sub, a trigger invokes the code. Google's trigger page offers two routes, and its advice is direct: "Direct Pub/Sub trigger (Recommended)", or Eventarc, "Use this if you need Eventarc's advanced filtering or routing features." Whichever you pick, one property of Pub/Sub shapes how you write the handler.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The ingest path left to right. An object lands in the constructed tw-lake-prod-landing bucket. The event reaches the function either through Pub/Sub with a direct trigger, which Google marks Recommended, or through an Eventarc trigger for advanced filtering or routing. The ingest function checks the path and starts a BigQuery load into a sales_raw partition. A band below warns that Pub/Sub delivers at least once by default, so the same file can arrive twice and the load must be idempotent.">
+        <defs>
+          <filter id="b6cSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="79" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b6cHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="b6cAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b6cH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b6cL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b6cS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b6cA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b6cN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="b6cH" x="30" y="26">ONE FILE LANDS, ONE TRIGGER FIRES, ONE PARTITION IS LOADED</text>
+
+        <g filter="url(#b6cSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="96" width="150" height="62" rx="8" transform="rotate(-1 105 127)" fill="url(#b6cHc)"/>
+          <rect x="230" y="50" width="220" height="56" rx="8" transform="rotate(0.8 340 78)" fill="#E8F0FE"/>
+          <rect x="230" y="150" width="220" height="56" rx="8" transform="rotate(-0.6 340 178)" fill="#FFFFFF"/>
+          <rect x="500" y="96" width="150" height="62" rx="8" transform="rotate(0.8 575 127)" fill="#FBBC04"/>
+          <rect x="700" y="96" width="150" height="62" rx="8" transform="rotate(-0.8 775 127)" fill="#FFFFFF"/>
+          <rect x="30" y="236" width="820" height="44" rx="10" transform="rotate(0.2 440 258)" fill="#E8F0FE"/>
+          <path d="M184 112 L224 82" marker-end="url(#b6cAr)"/>
+          <path d="M184 144 L224 174" marker-end="url(#b6cAr)"/>
+          <path d="M454 82 L494 112" marker-end="url(#b6cAr)"/>
+          <path d="M454 174 L494 144" marker-end="url(#b6cAr)"/>
+          <path d="M654 127 L694 127" marker-end="url(#b6cAr)"/>
+        </g>
+
+        <text class="b6cL" x="44" y="122">landing bucket</text>
+        <text class="b6cS" x="44" y="142">a .parquet object</text>
+        <text class="b6cL" x="246" y="76">Pub/Sub, direct trigger</text>
+        <text class="b6cA" x="246" y="94">Recommended by Google</text>
+        <text class="b6cL" x="246" y="176">Eventarc trigger</text>
+        <text class="b6cS" x="246" y="194">advanced filtering or routing</text>
+        <text class="b6cL" x="514" y="122">ingest function</text>
+        <text class="b6cL" x="514" y="142">checks the path</text>
+        <text class="b6cL" x="714" y="122">BigQuery load</text>
+        <text class="b6cS" x="714" y="142">sales_raw, one day</text>
+        <text class="b6cL" x="46" y="263">Pub/Sub is at-least-once by default: the same file can arrive twice, so the load must be safe to repeat.</text>
+
+        <text class="b6cN" x="30" y="304">Bucket and table names are constructed for Tidewater; the trigger options are Google's documented two.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow box is tonight's build-along; the band under it is the rule its load must obey</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>At-least-once means write it to run twice<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Pub/Sub's own overview: "By default, Pub/Sub offers at-least-once delivery with no ordering guarantees on all subscription types." Exactly-once delivery exists, but only on pull subscriptions and only "when subscribers connect to the service in the same region"; push and export subscriptions do not support it. So plan for the same landing event reaching your handler twice, and in any order.</p>
+        <p>The professional answer is an idempotent handler: running it twice leaves the same result as running it once. For ingest that usually means the target is decided by the file, not by the clock, and the load replaces that day's partition rather than appending to it. Tonight's handler does the first half: the target partition comes from the <code>dt=</code> in the name, so a duplicate event names the same partition. Pub/Sub design in depth lives in <a href="https://phoebefu6.github.io/learn-streaming-data-with-phoebe/">learn-streaming-data</a>.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The free tier, and the spend cap that now covers Cloud Run<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Cloud Run's pricing page lists a free tier for request-based billing, "based on us-central1 active pricing": the first 180,000 vCPU-seconds, 360,000 GiB-seconds and 2 million requests free per month. Cloud Run functions get "2 million invocations per month (includes both background and HTTP invocations)". The free usage "is aggregated across projects by billing account and resets every month", so ten small projects share one allowance. Read on 3 November 2026; free tiers change, so re-verify on the Cloud Run pricing page.</p>
+        <p>Budgets on their own only alert: "Setting an alerts-only budget doesn't automatically cap ... spending." Google's newer spend-cap budgets do stop spend, for a single project and a single eligible service, and the eligible list includes "Cloud Run, and Cloud Run functions". BigQuery is not on that list. The launch stage of spend caps is reported as Preview, not confirmed on the page we read.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The day the sales doubled.</strong> A retailer's dashboard shows one store's takings twice over for a single day. The cause is a redelivered landing event and a load that appended the same file a second time. Nothing failed, so nothing alerted. The fix is in the handler, not the dashboard: name the partition from the file and replace it on every load. The story is a constructed composite of a common failure.</p>
+    </div>
+  </section>
+
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>An ingest function on your laptop</h2>
+      <span class="tag demo">★ 22 min · everyone builds</span>
+    </div>
+    <p class="lede">Four steps, one Python file, two terminal windows. The functions framework serves your handler on <code>localhost:8080</code>, exactly as it would serve it inside Cloud Run, and <code>curl</code> plays the part of the landing event. The output at the end is pasted from a real run of exactly this code, with functions-framework 3.10.2 on Flask 3.1.3.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The build-along drawn left to right. curl posts JSON with a bucket and an object name to the functions framework on port 8080, which calls ingest with the request. The handler checks the name against a regular expression. A hive-style parquet path returns 200 accepted, into the orders table's 20261101 partition. A loose CSV path returns 400 rejected.">
+        <defs>
+          <filter id="b6dSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="83" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b6dHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="b6dAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b6dL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b6dS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b6dW { font: 800 12px Inter, sans-serif; fill: #FFFFFF; }
+          .b6dR { font: 800 11px Inter, sans-serif; fill: #991B1B; }
+          .b6dN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#b6dSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="80" width="140" height="60" rx="8" transform="rotate(-1 100 110)" fill="#FFFFFF"/>
+          <rect x="210" y="80" width="200" height="60" rx="8" transform="rotate(0.8 310 110)" fill="#174EA6" stroke="#174EA6"/>
+          <rect x="450" y="80" width="140" height="60" rx="8" transform="rotate(-0.8 520 110)" fill="#FBBC04"/>
+          <rect x="640" y="36" width="210" height="58" rx="8" transform="rotate(0.6 745 65)" fill="#E8F0FE"/>
+          <rect x="640" y="124" width="210" height="58" rx="8" transform="rotate(-0.6 745 153)" fill="#FEF2F2" stroke="#991B1B"/>
+          <path d="M174 110 L202 110" marker-end="url(#b6dAr)"/>
+          <path d="M414 110 L442 110" marker-end="url(#b6dAr)"/>
+          <path d="M594 100 L632 72" marker-end="url(#b6dAr)"/>
+          <path d="M594 120 L632 148" marker-end="url(#b6dAr)"/>
+        </g>
+
+        <text class="b6dL" x="44" y="106">curl POST</text>
+        <text class="b6dS" x="44" y="124">JSON: bucket, name</text>
+        <text class="b6dW" x="224" y="106">functions-framework</text>
+        <text class="b6dW" x="224" y="124">localhost:8080</text>
+        <text class="b6dL" x="464" y="106">ingest(request)</text>
+        <text class="b6dL" x="464" y="124">one regex</text>
+        <text class="b6dL" x="654" y="60">200 accepted</text>
+        <text class="b6dS" x="654" y="78">into orders$20261101</text>
+        <text class="b6dR" x="654" y="148">400 rejected</text>
+        <text class="b6dS" x="654" y="166">not sales/dt=YYYY-MM-DD</text>
+
+        <text class="b6dN" x="30" y="206">Locally, curl plays the landing event; once deployed, a trigger delivers it instead.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow handler is the only code you write; the framework and the trigger are Google's</figcaption>
+    </figure>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>Reuse the environment from builder session 1 and add the functions framework.</strong> Activate the same <code>.venv</code> as in <a href="b1-cloud-storage-layout-and-parquet.html">session 1</a>. The framework pulls in Flask; on the build laptop that was Flask 3.1.3.</p>
+        <div class="prompt-box good"><span class="label">★ Step 1 · setup (verified 3 November 2026, the session 1 environment)</span>. .venv/bin/activate
+pip install functions-framework==3.10.2</div>
+      </div>
+      <div class="step">
+        <p><strong>Write the handler.</strong> Save this as <code>main.py</code>. The regular expression is session 1's naming rule written as code: <code>sales/</code>, then <code>dt=</code> and a date, then one Parquet file. Anything else is refused with HTTP 400, so a bad file is loud on day one instead of silent in a dashboard.</p>
+        <div class="prompt-box good"><span class="label">★ Step 2 · main.py</span># Builder session 6: an ingest function, run locally with functions-framework (no Cloud Run needed).
+# Needs: pip install functions-framework==3.10.2
+# Run:   functions-framework --target=ingest --port=8080
+import re
+import functions_framework
+
+HIVE = re.compile(r"^sales/dt=(\d{4}-\d{2}-\d{2})/[^/]+\.parquet$")
+
+@functions_framework.http
+def ingest(request):
+    event = request.get_json(silent=True) or {}
+    bucket, name = event.get("bucket", ""), event.get("name", "")
+    m = HIVE.match(name)
+    if not m:
+        return {"status": "rejected", "reason": "path is not sales/dt=YYYY-MM-DD/*.parquet", "name": name}, 400
+    return {"status": "accepted",
+            "load": f"gs://{bucket}/{name}",
+            "into": f"tw-lake-prod.sales_raw.orders${m.group(1).replace('-', '')}"}, 200</div>
+      </div>
+      <div class="step">
+        <p><strong>Serve it.</strong> In the folder that holds <code>main.py</code>, start the framework and leave this terminal running. <code>--target</code> names the function to serve; 8080 is the framework's default port, written out here so it is visible.</p>
+        <div class="prompt-box good"><span class="label">★ Step 3 · terminal 1</span>functions-framework --target=ingest --port=8080</div>
+      </div>
+      <div class="step">
+        <p><strong>Send one good path and one bad one, and compare with this real output.</strong> Run the two <code>curl</code> lines in a second terminal. The accepted reply names the load target as <code>tw-lake-prod.sales_raw.orders$20261101</code>: the handler appends the file's date, without dashes, after a <code>$</code>, which is the form it uses to name one day's partition of the <code>orders</code> table as the target. The handler only decides; it does not start a real load, which would need a billing-enabled project. The final line is the HTTP status of the second request.</p>
+        <div class="prompt-box good"><span class="label">★ Step 4 · terminal 2 (real output)</span>$ curl -s -X POST localhost:8080 -H "Content-Type: application/json" -d '{"bucket":"tw-lake-prod-landing","name":"sales/dt=2026-11-01/part-0.parquet"}'
+{"into":"tw-lake-prod.sales_raw.orders$20261101","load":"gs://tw-lake-prod-landing/sales/dt=2026-11-01/part-0.parquet","status":"accepted"}
+
+$ curl -s -X POST localhost:8080 -H "Content-Type: application/json" -d '{"bucket":"tw-lake-prod-landing","name":"sales/2026-11-01.csv"}'
+{"name":"sales/2026-11-01.csv","reason":"path is not sales/dt=YYYY-MM-DD/*.parquet","status":"rejected"}
+
+HTTP 400</div>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <p><strong>On a billing-enabled project (optional).</strong> Shown, needs a billing-enabled project: the BigQuery sandbox covers BigQuery only, and the $300 Free Trial asks for a card. Either command below deploys the same <code>main.py</code>; the free tier in Part 3 covers an evening of testing. Check the flags against <code>gcloud functions deploy --help</code> and <code>gcloud run deploy --help</code> for your gcloud version before running them. A deployed trigger delivers its own event format rather than tonight's two-field JSON, so read the trigger page for the event shape and adjust the line that reads <code>bucket</code> and <code>name</code>. Delete what you deploy when you are done.</p>
+    </div>
+    <div class="prompt-box good"><span class="label">★ Shown, needs a billing-enabled project · check flags for your gcloud version</span># as a function (the functions commands are still supported after the rename)
+gcloud functions deploy ingest --gen2 --runtime=python311 --region=asia-southeast1 \
+  --source=. --entry-point=ingest --trigger-http
+
+# or as a Cloud Run service built from the same source
+gcloud run deploy ingest --source . --region=asia-southeast1</div>
+
+    <div class="prompt-box bad"><span class="label">✗ The handler that loads whatever arrives</span>def ingest(request):
+    event = request.get_json()
+    load(event["name"], into="sales_raw.orders")   # appends, any name, any format
+# a duplicate event appends the same rows twice; a stray CSV lands in the table</div>
+  </section>
+
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 7</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li><strong>Add a third case.</strong> Send <code>sales/dt=2026-11-31/part-0.parquet</code>. The regex accepts it, but the date does not exist. Change the handler so it rejects impossible dates too, and decide which HTTP status you would return.</li>
+      <li><strong>Route by prefix.</strong> Extend the handler so <code>loyalty/dt=.../*.parquet</code> goes to a <code>loyalty_pii</code> target and everything else is refused. Who at Tidewater should be told when a loyalty file is rejected?</li>
+      <li><strong>Prove it is idempotent.</strong> Send the accepted request twice. Write down why two identical answers are what you want, and what the real load would have to do for the second one to be harmless.</li>
+      <li><strong>Classify three jobs.</strong> Take three pieces of code your team runs on a schedule or on an event. Label each function, service or job, using Part 2's three signals.</li>
+    </ol>
+  </section>
+
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+    <p>Clear all three and builder session 6 gets stamped in your passport.</p>
+
+    <div class="quiz-q" data-answer="3">
+      <p class="qtext">1 · How long can a single request to a Cloud Run service run, at most?</p>
+      <button class="qopt" type="button">A · 5 minutes, and it cannot be changed</button>
+      <button class="qopt" type="button">B · 10 minutes</button>
+      <button class="qopt" type="button">C · 168 hours</button>
+      <button class="qopt" type="button">D · 60 minutes: the default is 5 minutes and it "can be extended up to 60 minutes (3600 seconds)"</button>
+      <p class="qwhy">Five minutes is the default, 60 the ceiling. Ten minutes and 168 hours are the default and maximum for a job's task, which is why long work goes to a job.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">2 · A 2023 guide tells you to "deploy a Cloud Function". What is that product called now?</p>
+      <button class="qopt" type="button">A · Cloud Run functions: since 22 August 2024 Google says Cloud Functions "is now Cloud Run functions", on unified Cloud Run infrastructure</button>
+      <button class="qopt" type="button">B · Dataflow</button>
+      <button class="qopt" type="button">C · It was retired with no replacement</button>
+      <button class="qopt" type="button">D · Cloud Run jobs</button>
+      <p class="qwhy">The event-driven model kept working, and Google committed to supporting the existing functions APIs and gcloud commands. Only the name and the infrastructure underneath changed.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">3 · Why must an ingest handler fed by Pub/Sub tolerate receiving the same file event twice?</p>
+      <button class="qopt" type="button">A · Because Cloud Run always calls every function twice</button>
+      <button class="qopt" type="button">B · It does not need to; Pub/Sub guarantees exactly one delivery on every subscription</button>
+      <button class="qopt" type="button">C · Pub/Sub's default is "at-least-once delivery with no ordering guarantees", so duplicates can happen and the load must be safe to repeat</button>
+      <button class="qopt" type="button">D · Because BigQuery rejects the first load of every file</button>
+      <p class="qwhy">Exactly-once delivery exists only for pull subscriptions in the same region. Design for duplicates: derive the target from the file and replace rather than append.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What this session teaches, and where it came from</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Services, jobs and functions on Cloud Run</span><span class="note">What is Cloud Run, read at source on 3 November 2026</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Request timeout 5 minutes default, up to 60; task timeout 10 minutes default, up to 168 hours</span><span class="note">Cloud Run request-timeout and task-timeout pages, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Cloud Functions is now Cloud Run functions, 22 August 2024</span><span class="note">Google Cloud blog rename post, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">pip install, --target and port 8080</span><span class="note">functions-framework-python README, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Direct Pub/Sub trigger or Eventarc; at-least-once delivery</span><span class="note">Create a Pub/Sub trigger; Pub/Sub subscription overview and exactly-once pages, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Free tier and spend-cap eligibility</span><span class="note">Cloud Run pricing; free cloud features; budgets and spend caps pages, read at source; spend-cap launch stage reported</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">The build-along output</span><span class="note">Real run on 3 November 2026, functions-framework 3.10.2, Flask 3.1.3</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">The Dockerfile and the deploy commands</span><span class="note">Shown, not run: Docker was not installed on the build laptop and deploys need billing</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Tidewater names and the three stories</span><span class="note">Constructed</span></div>
+    </div>
+    <p class="mono" style="margin-top:14px">Every fact on this page, and its verification tier, is recorded in the course's source map.</p>
+  </section>
+
+  <section class="cheat" id="cheatsheet">
+    <h3>Builder session 6 cheat sheet <span>· pin this</span></h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>Service</b><span>Waits for requests. Timeout 5 minutes by default, up to 60.</span></div>
+      <div class="cheat-item"><b>Job</b><span>Runs tasks and stops. 10 minutes by default, up to 168 hours.</span></div>
+      <div class="cheat-item"><b>Function</b><span>One event-driven handler. Formerly Cloud Functions, now Cloud Run functions.</span></div>
+      <div class="cheat-item"><b>Container</b><span>Write the image when you need system libraries, several routes or long work.</span></div>
+      <div class="cheat-item"><b>Triggers</b><span>Direct Pub/Sub trigger (Recommended) or Eventarc for advanced filtering and routing.</span></div>
+      <div class="cheat-item"><b>Idempotent</b><span>At-least-once delivery: target from the file, replace the partition, never blind append.</span></div>
+    </div>
+  </section>
+
+  <div class="callout next">
+    <span class="nx-pill">Next session</span>
+    <p>From moving data to learning from it. Session 7 meets Vertex AI (now Gemini Enterprise Agent Platform) and BigQuery ML, where a model is a <code>CREATE MODEL</code> statement, is honest about what the sandbox does and does not document, and fits a fare model on your laptop to compare.</p>
+  </div>
+
+  <footer class="pagefoot">
+    <span>Builder session 6 of 8 · learn-gcp-with-phoebe · by Phoebe Fu &nbsp;·&nbsp; 📚 <a href="https://phoebefu6.github.io/learn-with-phoebe/">Learn with Phoebe ↗</a></span>
+    <span><a href="b5-dataflow-and-beam-the-idea.html">← Prev: Dataflow and Beam, the idea</a> &nbsp;·&nbsp; <a href="b7-vertex-ai-and-bigquery-ml.html">Next: Vertex AI and BigQuery ML →</a></span>
+  </footer>
+
+</main>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

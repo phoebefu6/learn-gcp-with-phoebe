@@ -1,0 +1,19 @@
+WARNING:root:apitools not found, and bigquery client libraries are not available despite the import not raising an ImportError.
+WARNING:apache_beam.utils.subprocess_server:Really starting service at localhost:61665 with cmd: ('/Users/phoebe.fu/.apache_beam/cache/prism/bin/apache_beam-v2.77.0-prism-darwin-arm64', '--job_port', '61665', '--log_level', 'info', '--log_kind', 'json', '--serve_http=false')
+I1103 15:31:57.858643 3371825 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I1103 15:31:57.861642 3372121 ev_poll_posix.cc:588] FD from fork parent still in poll list: fd(5, generation: 1)
+INFO:PrismRunner:Serving JobManagement (endpoint='localhost:61665')
+INFO:PrismRunner:pipeline done! (job='job-001[job]')
+year 2013  mean fare  11.29
+year 2014  mean fare  12.52
+year 2015  mean fare  12.93
+year 2016  mean fare  13.86
+year 2017  mean fare  13.09
+year 2018  mean fare  15.11
+year 2019  mean fare  13.40
+year 2020  mean fare  22.74
+year 2021  mean fare  18.93
+year 2022  mean fare  20.80
+year 2023  mean fare  22.26
+2019 trips per 30-day window: [300, 150, 150, 150, 150, 150, 150, 150, 150, 150, 149]
+WARNING:apache_beam.utils.subprocess_server:Really destroying service at localhost:61665 with cmd: ('/Users/phoebe.fu/.apache_beam/cache/prism/bin/apache_beam-v2.77.0-prism-darwin-arm64', '--job_port', '61665', '--log_level', 'info', '--log_kind', 'json', '--serve_http=false')

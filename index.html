@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Fourteen sessions on Google Cloud for data and AI teams: the resource hierarchy, BigQuery as warehouse and lake, IAM as Google evaluates it, pipelines without servers, the bytes behind the bill, Dataflow, Cloud Run and Vertex AI, ending in a bench that evaluates IAM requests and meters BigQuery bytes on real taxi trips.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="GCP for Data &amp; AI Teams - Learn with Phoebe">
+<meta property="og:description" content="SELECT * on a 77 GiB public table costs $0.47 a run; three columns cost $0.03. One Editor grant takes an analyst from 27 to 320 permissions on a table.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="GCP for Data &amp; AI Teams - Learn with Phoebe">
+<meta name="twitter:description" content="BigQuery, IAM, Cloud Storage, Dataflow, Cloud Run and Vertex AI for data teams, with a bench on real bytes.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Learn GCP with Phoebe</title>
+<link rel="stylesheet" href="assets/style.css?v=2">
+<style>
+
+  .stats-row { display: flex; gap: 2.4rem; margin-top: 1.5rem; flex-wrap: wrap; }
+  .stat b { display: block; font-size: 2.1rem; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: .72rem; opacity: 1; text-transform: uppercase; letter-spacing: .09em; font-weight: 600; }
+
+  .course-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 1rem; margin-top: 1.5rem; }
+  .course-card {
+    border: 1px solid var(--hairline);
+    border-top: 4px solid var(--diff, var(--indigo));
+    border-radius: var(--radius);
+    padding: 1.2rem 1.3rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    text-decoration: none;
+    color: var(--ink);
+    background: #fff;
+    transition: box-shadow .15s ease, border-color .15s ease, transform .15s ease;
+    position: relative;
+  }
+  .course-card:hover { border-color: var(--indigo-soft); border-top-color: var(--diff, var(--indigo)); box-shadow: 0 8px 28px rgba(var(--shadow-rgb),.16); transform: translateY(-3px); }
+  .course-card .cicon { font-size: 1.7rem; line-height: 1; }
+  .course-card .cnum { font-size: .72rem; font-weight: 700; color: var(--indigo); text-transform: uppercase; letter-spacing: .1em; }
+  .course-card h3 { font-size: 1.05rem; font-weight: 800; line-height: 1.3; }
+  .course-card p { font-size: .85rem; color: var(--muted); flex: 1; }
+  .course-card .meta { display: flex; gap: .4rem; flex-wrap: wrap; }
+
+  .diff-legend { display: flex; gap: 1rem; margin-top: 1.6rem; font-size: .74rem; color: var(--muted); font-weight: 600; flex-wrap: wrap; }
+  .diff-legend i { display: inline-block; width: .85rem; height: .35rem; border-radius: 999px; margin-right: .35rem; vertical-align: middle; }
+
+  .paths { margin-top: 2.6rem; }
+  .paths h2 { font-size: 1.3rem; font-weight: 800; margin-bottom: .3rem; }
+  .paths .plede { color: var(--muted); font-size: .92rem; margin-bottom: .8rem; }
+  .path { display: flex; gap: .55rem; align-items: center; padding: .75rem 0; border-bottom: .5px solid var(--hairline); flex-wrap: wrap; }
+  .path:last-child { border-bottom: none; }
+  .path b { min-width: 15.5rem; font-size: .9rem; }
+  .path .pstep { background: var(--indigo-50); color: var(--indigo-deep); border-radius: 999px; padding: .16rem .68rem; font-weight: 700; font-size: .8rem; text-decoration: none; transition: all .12s ease; }
+  .path .pstep:hover { background: var(--indigo); color: #fff; }
+  .path .parr { color: var(--muted); font-weight: 700; }
+
+  .mm-section { margin-top: 1.6rem; }
+  .mm-section h2 { font-size: 1.3rem; font-weight: 800; margin-bottom: .2rem; }
+  .mm-section .mm-lede { color: var(--muted); font-size: .92rem; margin-bottom: .4rem; }
+  .mm-wrap { border: 1px solid var(--hairline); border-radius: var(--radius); background: linear-gradient(180deg, #fff, var(--indigo-50)); padding: .6rem; overflow-x: auto; }
+  .mm-svg { width: 100%; height: auto; display: block; max-width: 60rem; margin: 0 auto; min-width: 34rem; }
+  .mm-link { cursor: pointer; text-decoration: none; }
+  .mm-node rect { transition: opacity .15s ease, filter .15s ease; }
+  .mm-node text { pointer-events: none; }
+  .mm-link:hover .mm-node rect { filter: brightness(1.06); }
+  .mm-edge { transition: opacity .15s ease; }
+  .bench-link { margin-top: 1rem; }
+  .bench-link a { display: inline-block; font-weight: 800; color: var(--indigo-deep); background: var(--amber-50); border: 1.5px solid var(--amber); border-radius: 999px; padding: .35rem 1rem; text-decoration: none; }
+  .bench-link a:hover { background: var(--amber); color: var(--ink); }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn with Phoebe · Data Engineering</div>
+    <h1>GCP for <span class="accent">Data &amp; AI Teams</span></h1>
+    <p class="sub">Google Cloud is a tree of projects that each carry a bill and a set of permissions, with BigQuery charging by the bytes a query reads. Six leader sessions teach a data leader to read that sentence in every proposal and every bill, with no code and no account. Eight builder sessions do the work in the free BigQuery sandbox and on a laptop, on real Chicago taxi trips, and end in a bench that evaluates IAM requests the way Google documents and meters every byte a query reads.</p>
+    <div class="stats-row">
+      <div class="stat"><b data-count="14">14</b><span>sessions, two tracks</span></div>
+      <div class="stat"><b data-count="27">27</b><span>IAM cases on the bench</span></div>
+      <div class="stat"><b data-count="18362">18362</b><span>real Chicago taxi trips</span></div>
+      <div class="stat"><b data-count="0">0</b><span>credit cards required</span></div>
+      <div class="stat"><b data-count="45">45</b><span>min per session</span></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="section">
+    <div class="paths" style="margin-top:0">
+      <h2>Leader track 🧭 <span style="font-size:.85rem;font-weight:600;color:var(--muted)">· six sessions, no code, no account</span></h2>
+      <p class="plede">For data and AI leaders, managers and architects who sign off on cloud plans and bills. Which project the work lives in, who may touch it, which meter is running, where the bill comes from, and the platform on one page.</p>
+    </div>
+
+    <div class="course-grid">
+      <a class="course-card" href="courses/a1-what-gcp-is-to-a-data-team.html" style="--diff:#34D399">
+        <span class="cicon">🗺️</span>
+        <span class="cnum">Leader session 1 · start here</span>
+        <h3>What GCP is to a data team</h3>
+        <p>Organization, folders and projects, where billing and access attach, regions and multi-regions, the AWS name map, and the meters behind every bill.</p>
+        <span class="meta"><span class="pill amber">▶ Start here</span></span>
+      </a>
+      <a class="course-card" href="courses/a2-bigquery-is-the-warehouse-and-the-lake.html" style="--diff:#FBBF24">
+        <span class="cicon">🏛️</span>
+        <span class="cnum">Leader session 2</span>
+        <h3>BigQuery is the warehouse and the lake</h3>
+        <p>Storage and compute billed apart, datasets and tables, external and BigLake tables over Cloud Storage, and why a serverless warehouse changes team shape.</p>
+      </a>
+      <a class="course-card" href="courses/a3-who-gets-in-at-which-level.html" style="--diff:#FBBF24">
+        <span class="cicon">🔐</span>
+        <span class="cnum">Leader session 3</span>
+        <h3>Who gets in, at which level</h3>
+        <p>IAM down the hierarchy: allow policies unioned, basic, predefined and custom roles, service accounts, deny policies first, conditions, and what org policy is not.</p>
+      </a>
+      <a class="course-card" href="courses/a4-pipelines-without-servers.html" style="--diff:#FB923C">
+        <span class="cicon">⚙️</span>
+        <span class="cnum">Leader session 4</span>
+        <h3>Pipelines without servers</h3>
+        <p>Dataflow, managed Spark, scheduled SQL and Cloud Run compared by workload and by meter, with Pub/Sub for events.</p>
+      </a>
+      <a class="course-card" href="courses/a5-the-bytes-behind-the-bill.html" style="--diff:#FB923C">
+        <span class="cicon">🧾</span>
+        <span class="cnum">Leader session 5</span>
+        <h3>The bytes behind the bill</h3>
+        <p>On-demand bytes against slots and editions, active and long-term storage, the 10 MB minimum, egress, and the quotas and ceilings that actually stop spend.</p>
+      </a>
+      <a class="course-card" href="courses/a6-tidewaters-platform-on-one-page.html" style="--diff:#F87171">
+        <span class="cicon">📐</span>
+        <span class="cnum">Leader session 6</span>
+        <h3>Tidewater&#x27;s platform on one page</h3>
+        <p>The capstone: a constructed grocery chain&#x27;s reference architecture, governance with Knowledge Catalog and policy tags, and who owns which project.</p>
+        <span class="meta"><span class="pill amber">the leader capstone</span></span>
+      </a>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="paths" style="margin-top:0">
+      <h2>Builder track 🔬 <span style="font-size:.85rem;font-weight:600;color:var(--muted)">· eight sessions, BigQuery sandbox and a laptop</span></h2>
+      <p class="plede">SQL in the free BigQuery sandbox on public datasets, and Python, Apache Beam and functions-framework run locally. Anything that needs a billing-enabled project is shown and labelled, never assumed.</p>
+    </div>
+
+    <div class="course-grid">
+      <a class="course-card" href="courses/b1-cloud-storage-layout-and-parquet.html" style="--diff:#34D399">
+        <span class="cicon">🧱</span>
+        <span class="cnum">Builder session 1 · start here</span>
+        <h3>Cloud Storage layout and Parquet</h3>
+        <p>Buckets, classes and lifecycle rules, hive-style partition folders and Parquet, built on a laptop from 18,362 real Chicago taxi trips.</p>
+        <span class="meta"><span class="pill amber">▶ Start here</span></span>
+      </a>
+      <a class="course-card" href="courses/b2-bigquery-in-the-sandbox.html" style="--diff:#FBBF24">
+        <span class="cicon">🧪</span>
+        <span class="cnum">Builder session 2</span>
+        <h3>BigQuery in the sandbox</h3>
+        <p>The free sandbox, no card: public datasets, first queries on the full taxi table, the dry run and a maximum-bytes-billed ceiling.</p>
+      </a>
+      <a class="course-card" href="courses/b3-partitioning-and-clustering.html" style="--diff:#FBBF24">
+        <span class="cicon">🗜️</span>
+        <span class="cnum">Builder session 3</span>
+        <h3>Partitioning and clustering</h3>
+        <p>Time-unit, ingestion-time and integer-range partitions, require_partition_filter, cluster column order, and the bytes each one saves.</p>
+      </a>
+      <a class="course-card" href="courses/b4-iam-as-gcp-evaluates-it.html" style="--diff:#FB923C">
+        <span class="cicon">🛂</span>
+        <span class="cnum">Builder session 4</span>
+        <h3>IAM as GCP evaluates it</h3>
+        <p>A dataset grant, a pipeline&#x27;s service account and a deny policy, read the way Google evaluates them, with the evaluator run on a laptop.</p>
+      </a>
+      <a class="course-card" href="courses/b5-dataflow-and-beam-the-idea.html" style="--diff:#FB923C">
+        <span class="cicon">🌊</span>
+        <span class="cnum">Builder session 5</span>
+        <h3>Dataflow and Beam, the idea</h3>
+        <p>PCollections, transforms and windows in a real Apache Beam pipeline on the local runner, and when Dataflow beats BigQuery SQL.</p>
+      </a>
+      <a class="course-card" href="courses/b6-cloud-run-or-a-function.html" style="--diff:#FB923C">
+        <span class="cicon">🚀</span>
+        <span class="cnum">Builder session 6</span>
+        <h3>Cloud Run or a function</h3>
+        <p>Container or function for ingest: an HTTP function served locally by functions-framework, and the Pub/Sub trigger it would get in the cloud.</p>
+      </a>
+      <a class="course-card" href="courses/b7-vertex-ai-and-bigquery-ml.html" style="--diff:#FB923C">
+        <span class="cicon">🤖</span>
+        <span class="cnum">Builder session 7</span>
+        <h3>Vertex AI and BigQuery ML</h3>
+        <p>CREATE MODEL in SQL, what it costs and where it needs billing, the same model fitted on a laptop, and Vertex AI (now Agent Platform) as the platform.</p>
+      </a>
+      <a class="course-card" href="courses/b8-the-gcp-iam-and-cost-bench.html" style="--diff:#F87171">
+        <span class="cicon">🎛️</span>
+        <span class="cnum">Builder session 8</span>
+        <h3>The GCP IAM and cost bench</h3>
+        <p>An IAM evaluator checked against 27 cases built from Google&#x27;s rules, with an Editor anti-lever and break buttons, beside a BigQuery bytes meter on real trips.</p>
+        <span class="meta"><span class="pill amber">the builder capstone</span></span>
+      </a>
+    </div>
+    <p class="bench-link"><a href="courses/b8-the-gcp-iam-and-cost-bench.html#bench">🎛️ Open the IAM and cost bench →</a></p>
+
+    <div class="diff-legend">
+      <span><i style="background:#34D399"></i>start here</span>
+      <span><i style="background:#FBBF24"></i>foundations</span>
+      <span><i style="background:#FB923C"></i>hands-on</span>
+      <span><i style="background:#F87171"></i>advanced and capstone</span>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="paths">
+      <h2>Choose your path 🗺️</h2>
+      <p class="plede">Three doors into the same platform. Each track starts at its own session 1, because the tree and the meters are what make the rest arguable.</p>
+      <div class="path"><b>💼 I sign off on the cloud plan</b>
+        <a class="pstep" href="courses/a1-what-gcp-is-to-a-data-team.html">L1</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/a3-who-gets-in-at-which-level.html">L3</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/a5-the-bytes-behind-the-bill.html">L5</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/a6-tidewaters-platform-on-one-page.html">L6</a>
+        <span style="font-size:.82rem;color:var(--muted)">the tree, the gate, the bill, then the one-page platform</span>
+      </div>
+      <div class="path"><b>🤖 I am putting AI on Google Cloud</b>
+        <a class="pstep" href="courses/a1-what-gcp-is-to-a-data-team.html">L1</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/a2-bigquery-is-the-warehouse-and-the-lake.html">L2</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/b7-vertex-ai-and-bigquery-ml.html">B7</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/b8-the-gcp-iam-and-cost-bench.html">B8</a>
+        <span style="font-size:.82rem;color:var(--muted)">the tree, BigQuery, BigQuery ML and Vertex AI, then the bench</span>
+      </div>
+      <div class="path"><b>🔬 I build the lake</b>
+        <a class="pstep" href="courses/b1-cloud-storage-layout-and-parquet.html">B1</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/b2-bigquery-in-the-sandbox.html">B2</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/b3-partitioning-and-clustering.html">B3</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/b4-iam-as-gcp-evaluates-it.html">B4</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/b8-the-gcp-iam-and-cost-bench.html">B8</a>
+        <span style="font-size:.82rem;color:var(--muted)">layout, the sandbox, partitions, IAM, then the bench</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="paths" style="margin-top:0">
+      <h2>Your passport 🎫</h2>
+      <p class="plede">Clear all three quiz questions in a session and it gets stamped. Fourteen stamps across both tracks, and they live in this browser only.</p>
+    </div>
+    <div class="pp-strip"></div>
+  </section>
+
+  <section class="section">
+    <div class="paths" style="margin-top:0">
+      <h2>What is real here 🧾</h2>
+      <p class="plede">Pages about cloud bills and permissions should be exact about which of their own numbers are computed, which are priced, and which are modelled.</p>
+    </div>
+    <table class="clean">
+      <tr><th>Claim</th><th>Status</th></tr>
+      <tr><td>The data</td><td>Real. 18,362 trips from the City of Chicago's Taxi Trips (2013-2023), drawn with a fixed seed and shipped; BigQuery hosts the full table publicly. Used under the City of Chicago's data Terms of Use</td></tr>
+      <tr><td>Every byte count</td><td>Computed from BigQuery's documented data type sizes on those rows and scaled to the table's 211,670,894 rows; a Python reference agrees with the browser to the byte</td></tr>
+      <tr><td>Every price</td><td>Read from Google's pricing pages (us-central1 default table) on 3 November 2026, with the date on every widget. Prices change: re-verify before relying on them</td></tr>
+      <tr><td>The IAM evaluator</td><td>Written to Google's documented order, deny first then the union of allow policies, with Google's own permission lists for eight predefined roles; checked against 27 cases in the browser and in Python, and shown failing when deliberately broken</td></tr>
+      <tr><td>Builder outputs</td><td>Laptop steps (pyarrow, DuckDB, Apache Beam, functions-framework) were really run, versions named. Sandbox outputs are marked "expected, your numbers will differ"</td></tr>
+      <tr><td>Modelled</td><td>Clustered block layout, the contents of the legacy basic roles, and slot reservations billed by the hour; each labelled where it appears</td></tr>
+      <tr><td>Tidewater Grocers</td><td>Constructed: a fictional APAC grocery chain used for every hierarchy and IAM example</td></tr>
+    </table>
+  </section>
+
+  <section class="section mm-section">
+    <h2>The knowledge map 🧠</h2>
+    <p class="mm-lede">Both tracks at a glance - hover a session to spotlight its concepts, click any node to jump in.</p>
+    <div class="mm-wrap"><div id="mindmap"></div></div>
+  </section>
+
+  <footer class="pagefoot">
+    <span>learn-gcp-with-phoebe · by Phoebe Fu &nbsp;·&nbsp; 📚 <a href="https://phoebefu6.github.io/learn-with-phoebe/">Learn with Phoebe ↗</a></span>
+    <span>Neighbours on the shelf: <a href="https://phoebefu6.github.io/learn-aws-with-phoebe/">AWS ↗</a> &nbsp;·&nbsp; <a href="https://phoebefu6.github.io/learn-terraform-with-phoebe/">Terraform ↗</a> &nbsp;·&nbsp; <a href="https://phoebefu6.github.io/learn-data-warehouse-with-phoebe/">Data Warehouse ↗</a> &nbsp;·&nbsp; <a href="https://phoebefu6.github.io/learn-data-access-control-with-phoebe/">Data Access Control ↗</a></span>
+  </footer>
+
+</main>
+
+<script>
+window.MINDMAP_DATA = {
+  "title": "GCP for\nData & AI Teams",
+  "centerColor": "#174EA6",
+  "sessions": [
+    {
+      "label": "What GCP is",
+      "href": "courses/a1-what-gcp-is-to-a-data-team.html",
+      "color": "#34D399",
+      "concepts": [
+        {
+          "label": "Resource hierarchy",
+          "href": "courses/a1-what-gcp-is-to-a-data-team.html"
+        },
+        {
+          "label": "The meters",
+          "href": "courses/a1-what-gcp-is-to-a-data-team.html"
+        }
+      ]
+    },
+    {
+      "label": "Warehouse + lake",
+      "href": "courses/a2-bigquery-is-the-warehouse-and-the-lake.html",
+      "color": "#FBBF24",
+      "concepts": [
+        {
+          "label": "Storage vs compute",
+          "href": "courses/a2-bigquery-is-the-warehouse-and-the-lake.html"
+        },
+        {
+          "label": "BigLake tables",
+          "href": "courses/a2-bigquery-is-the-warehouse-and-the-lake.html"
+        }
+      ]
+    },
+    {
+      "label": "Who gets in",
+      "href": "courses/a3-who-gets-in-at-which-level.html",
+      "color": "#FBBF24",
+      "concepts": [
+        {
+          "label": "Inherited allow",
+          "href": "courses/a3-who-gets-in-at-which-level.html"
+        },
+        {
+          "label": "Deny first",
+          "href": "courses/a3-who-gets-in-at-which-level.html"
+        }
+      ]
+    },
+    {
+      "label": "Pipelines",
+      "href": "courses/a4-pipelines-without-servers.html",
+      "color": "#FB923C",
+      "concepts": [
+        {
+          "label": "Pick by workload",
+          "href": "courses/a4-pipelines-without-servers.html"
+        },
+        {
+          "label": "Pub/Sub events",
+          "href": "courses/a4-pipelines-without-servers.html"
+        }
+      ]
+    },
+    {
+      "label": "The bytes bill",
+      "href": "courses/a5-the-bytes-behind-the-bill.html",
+      "color": "#FB923C",
+      "concepts": [
+        {
+          "label": "On-demand vs slots",
+          "href": "courses/a5-the-bytes-behind-the-bill.html"
+        },
+        {
+          "label": "Cost ceilings",
+          "href": "courses/a5-the-bytes-behind-the-bill.html"
+        }
+      ]
+    },
+    {
+      "label": "One-page platform",
+      "href": "courses/a6-tidewaters-platform-on-one-page.html",
+      "color": "#F87171",
+      "concepts": [
+        {
+          "label": "Reference architecture",
+          "href": "courses/a6-tidewaters-platform-on-one-page.html"
+        },
+        {
+          "label": "Project owners",
+          "href": "courses/a6-tidewaters-platform-on-one-page.html"
+        }
+      ]
+    },
+    {
+      "label": "Storage layout",
+      "href": "courses/b1-cloud-storage-layout-and-parquet.html",
+      "color": "#34D399",
+      "concepts": [
+        {
+          "label": "Storage classes",
+          "href": "courses/b1-cloud-storage-layout-and-parquet.html"
+        },
+        {
+          "label": "Hive layout",
+          "href": "courses/b1-cloud-storage-layout-and-parquet.html"
+        }
+      ]
+    },
+    {
+      "label": "Sandbox",
+      "href": "courses/b2-bigquery-in-the-sandbox.html",
+      "color": "#FBBF24",
+      "concepts": [
+        {
+          "label": "Dry run",
+          "href": "courses/b2-bigquery-in-the-sandbox.html"
+        },
+        {
+          "label": "Bytes ceiling",
+          "href": "courses/b2-bigquery-in-the-sandbox.html"
+        }
+      ]
+    },
+    {
+      "label": "Partitions",
+      "href": "courses/b3-partitioning-and-clustering.html",
+      "color": "#FBBF24",
+      "concepts": [
+        {
+          "label": "Partition pruning",
+          "href": "courses/b3-partitioning-and-clustering.html"
+        },
+        {
+          "label": "Cluster blocks",
+          "href": "courses/b3-partitioning-and-clustering.html"
+        }
+      ]
+    },
+    {
+      "label": "IAM evaluated",
+      "href": "courses/b4-iam-as-gcp-evaluates-it.html",
+      "color": "#FB923C",
+      "concepts": [
+        {
+          "label": "Service accounts",
+          "href": "courses/b4-iam-as-gcp-evaluates-it.html"
+        },
+        {
+          "label": "Deny policies",
+          "href": "courses/b4-iam-as-gcp-evaluates-it.html"
+        }
+      ]
+    },
+    {
+      "label": "Dataflow + Beam",
+      "href": "courses/b5-dataflow-and-beam-the-idea.html",
+      "color": "#FB923C",
+      "concepts": [
+        {
+          "label": "PCollections",
+          "href": "courses/b5-dataflow-and-beam-the-idea.html"
+        },
+        {
+          "label": "Windows",
+          "href": "courses/b5-dataflow-and-beam-the-idea.html"
+        }
+      ]
+    },
+    {
+      "label": "Cloud Run",
+      "href": "courses/b6-cloud-run-or-a-function.html",
+      "color": "#FB923C",
+      "concepts": [
+        {
+          "label": "Functions locally",
+          "href": "courses/b6-cloud-run-or-a-function.html"
+        },
+        {
+          "label": "Pub/Sub trigger",
+          "href": "courses/b6-cloud-run-or-a-function.html"
+        }
+      ]
+    },
+    {
+      "label": "Vertex + BQML",
+      "href": "courses/b7-vertex-ai-and-bigquery-ml.html",
+      "color": "#FB923C",
+      "concepts": [
+        {
+          "label": "CREATE MODEL",
+          "href": "courses/b7-vertex-ai-and-bigquery-ml.html"
+        },
+        {
+          "label": "Model Garden",
+          "href": "courses/b7-vertex-ai-and-bigquery-ml.html"
+        }
+      ]
+    },
+    {
+      "label": "The bench",
+      "href": "courses/b8-the-gcp-iam-and-cost-bench.html",
+      "color": "#F87171",
+      "concepts": [
+        {
+          "label": "27 IAM cases",
+          "href": "courses/b8-the-gcp-iam-and-cost-bench.html"
+        },
+        {
+          "label": "Anti-lever",
+          "href": "courses/b8-the-gcp-iam-and-cost-bench.html"
+        },
+        {
+          "label": "Bytes ladder",
+          "href": "courses/b8-the-gcp-iam-and-cost-bench.html"
+        }
+      ]
+    }
+  ]
+};
+</script>
+<script src="assets/app.js?v=1"></script>
+<script src="assets/mindmap.js?v=1"></script>
+</body>
+</html>

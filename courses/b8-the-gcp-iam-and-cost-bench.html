@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Builder session 8 of 8. Two engines in the browser: a Google Cloud IAM evaluator checked against 27 cases built from Google's documented rules, and a BigQuery on-demand cost meter on real Chicago taxi trips.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="The GCP IAM and cost bench - learn gcp with phoebe">
+<meta property="og:description" content="Builder session 8 of 8. One roles/editor grant takes an analyst from 27 to 320 permissions on a table. One query goes from 77.03 GiB to the 10 MB minimum.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/courses/b8-the-gcp-iam-and-cost-bench.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="The GCP IAM and cost bench - learn gcp with phoebe">
+<meta name="twitter:description" content="Builder session 8 of 8. An IAM evaluator and a BigQuery cost meter, computed in your browser.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Builder session 8 · The GCP IAM and cost bench - learn gcp with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=2">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-gcp-with-phoebe</a> / Builder session 8 of 8</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn GCP with Phoebe · Builder track · Session 8 of 8</div>
+    <h1>The GCP IAM and cost <span class="accent">bench</span></h1>
+    <p class="sub">Two questions decide whether a Google Cloud data platform is safe and affordable: will this request be allowed, and what will this query cost? Tonight both are computed in your browser instead of argued. The first half is an IAM evaluator written to Google's documented order, deny policies first, then allow policies unioned down the hierarchy, checked against 27 cases, with an anti-lever that shows what one basic role hands over and two break buttons that prove the cases can fail. The second half meters BigQuery on-demand bytes on real Chicago taxi trips, rung by rung.</p>
+    <div class="chip-row">
+      <span class="chip level">🔴 Bench night</span>
+      <span class="chip audience">Bring your session 3 query and session 4 policy</span>
+      <span class="chip audience">No code tonight, all clicking</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:3">3-14 · What the engines follow</span>
+      <span class="a3" style="flex:6">14-40 · Requests, then queries, on the bench</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where we start</h2>
+    </div>
+    <p class="lede">A bench is a fixed set of inputs and a fixed question, so that when two choices give two answers the only thing that differed was the choice. The IAM half asks 25 requests and checks 2 bindings against the constructed Tidewater hierarchy, each with the verdict Google's documented rules say it must get. The cost half asks one question of the same public table four ways. Every verdict is computed by the evaluator in this page, every byte count follows BigQuery's documented data type sizes measured on real rows, and every price carries the date it was read. What is modelled, the basic roles' contents and the clustered block layout, is labelled on the widget.</p>
+
+    <div class="legend">
+      <span class="pill">🎫 Clear all three quiz questions to stamp your passport</span>
+      <span class="pill">computed = the engine in this page, on the data shown</span>
+      <span class="pill">modelled = our stated model where Google publishes no detail</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> An IAM evaluator you can trust because you watched it fail when broken, the count of what one <code>roles/editor</code> grant hands an analyst (27 permissions on a table become 320 of the 334 modelled), and a byte-by-byte answer to "what does this query cost?", from 77.03 GiB for <code>SELECT *</code> down to the 10 MB minimum.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers the evaluation order the evaluator implements</span>
+      <h2>Deny first, then the union of everything above</h2>
+      <span class="tag concept">6 min live</span>
+    </div>
+    <p class="lede">Google states the order in one sentence: "IAM always checks relevant deny policies before checking relevant allow policies." Deny policies attach to an organization, folder or project and "are inherited by all lower-level resources". Allow policies are then read from the resource up: "The effective allow policy for a resource is the union of the allow policy set at that resource and the allow policy inherited from its parent." If nothing grants the permission, it is not granted. The evaluator on this page follows those three steps for one stated scope.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The evaluation drawn as a request climbing the Tidewater hierarchy twice. On the left, step 1 climbs from the table sales_raw.orders through dataset, project tw-lake-prod, folder data-platform and the organization, checking deny rules at the project, folder and organization; one matching deny rule ends the evaluation with Denied. On the right, step 2 climbs the same ladder reading allow bindings at every level and unions them; any binding whose role holds the permission and whose condition is true grants. At the bottom, step 3: nothing granted means Not granted.">
+        <defs>
+          <filter id="b8aSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="61" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <marker id="b8aAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b8aH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b8aL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b8aS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b8aW { font: 800 12px Inter, sans-serif; fill: #FFFFFF; }
+          .b8aR { font: 800 11px Inter, sans-serif; fill: #991B1B; }
+          .b8aA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b8aN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="b8aH" x="30" y="26">ONE REQUEST: raj READS, THEN WRITES, sales_raw.orders (CONSTRUCTED TIDEWATER)</text>
+
+        <g filter="url(#b8aSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="44" width="400" height="250" rx="14" transform="rotate(-0.3 230 169)" fill="#FEF2F2" stroke="#991B1B"/>
+          <rect x="460" y="44" width="390" height="250" rx="14" transform="rotate(0.3 655 169)" fill="#E8F0FE"/>
+          <rect x="60" y="82" width="200" height="30" rx="6" fill="#FFFFFF"/>
+          <rect x="60" y="126" width="200" height="30" rx="6" fill="#FFFFFF"/>
+          <rect x="60" y="170" width="200" height="30" rx="6" fill="#FBBC04"/>
+          <rect x="60" y="214" width="200" height="30" rx="6" fill="#FFFFFF"/>
+          <rect x="490" y="82" width="200" height="30" rx="6" fill="#FFFFFF"/>
+          <rect x="490" y="126" width="200" height="30" rx="6" fill="#FFFFFF"/>
+          <rect x="490" y="170" width="200" height="30" rx="6" fill="#FFFFFF"/>
+          <rect x="490" y="214" width="200" height="30" rx="6" fill="#174EA6" stroke="#174EA6"/>
+          <path d="M160 214 L160 206" marker-end="url(#b8aAr)"/>
+          <path d="M590 248 L590 252"/>
+          <rect x="200" y="314" width="480" height="40" rx="10" transform="rotate(0.4 440 334)" fill="#FFFFFF"/>
+        </g>
+
+        <text class="b8aR" x="46" y="66">STEP 1 · DENY POLICIES, CHECKED FIRST</text>
+        <text class="b8aL" x="72" y="102">organization</text>
+        <text class="b8aS" x="270" y="102">pii fence: tag false</text>
+        <text class="b8aL" x="72" y="146">folder data-platform</text>
+        <text class="b8aS" x="270" y="146">contractors only</text>
+        <text class="b8aL" x="72" y="190">project tw-lake-prod</text>
+        <text class="b8aR" x="270" y="190">writes: MATCH</text>
+        <text class="b8aL" x="72" y="234">dataset, table</text>
+        <text class="b8aS" x="270" y="234">no deny here</text>
+        <text class="b8aR" x="46" y="280">updateData: Denied, allow is never read</text>
+        <text class="b8aA" x="476" y="66">STEP 2 · ALLOW, UNION UP THE TREE</text>
+        <text class="b8aL" x="502" y="102">organization</text>
+        <text class="b8aS" x="700" y="102">nothing for raj</text>
+        <text class="b8aL" x="502" y="146">folder data-platform</text>
+        <text class="b8aS" x="700" y="146">dataEditor</text>
+        <text class="b8aL" x="502" y="190">project tw-lake-prod</text>
+        <text class="b8aS" x="700" y="190">nothing for raj</text>
+        <text class="b8aW" x="502" y="234">table sales_raw.orders</text>
+        <text class="b8aS" x="700" y="234">starts here</text>
+        <text class="b8aA" x="476" y="280">getData: Allowed by the folder grant</text>
+        <text class="b8aL" x="216" y="339">STEP 3 · nothing granted anywhere: Not granted</text>
+
+        <text class="b8aN" x="30" y="374">Cases c05 and c06 on the bench: the same person, two permissions, two verdicts, decided at two different levels.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow rung is the project deny on writes to env=prod tables; it ends step 1 before any allow is read</figcaption>
+    </figure>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>What the evaluator does, and refuses to do<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A deny rule applies when the principal is a denied principal and not an exception principal, the permission is denied and not an exception permission, and the denial condition is true or absent. Deny permissions use Google's format <code>SERVICE_FQDN/RESOURCE.ACTION</code>, such as <code>bigquery.googleapis.com/tables.updateData</code>, and permission groups such as <code>storage.googleapis.com/objects.*</code>. Denial conditions "only recognize resource tag functions", so the evaluator reads <code>resource.matchTag</code> against tags inherited down the tree. Allow bindings grant when the principal or one of its groups is a member, the role holds the permission, and the IAM Condition is true; conditions are a small CEL subset: <code>resource.name.startsWith</code>, <code>request.time</code> compared with a timestamp, <code>!</code>, <code>&amp;&amp;</code>, <code>||</code>.</p>
+        <p>It does not model principal access boundary policies, custom roles, organization policy constraints, BigQuery's dataset access lists, or any CEL beyond that subset, and it throws rather than guessing on anything it does not know. The predefined roles carry Google's own permission lists, read from the roles reference on 3 November 2026: Data Viewer 27 permissions, Data Editor 67, Data Owner 101, Job User 11, BigQuery User 41, BigQuery Admin 302, Storage Object Viewer 8, Storage Object Admin 32. The legacy basic roles are modelled, because Google lists their thousands of permissions only in the console: Viewer as the read-only verbs, Editor as everything except setting IAM policy, Owner as all. The same logic runs in Python, and on all 27 cases in three modes plus the anti-lever counts, Python and the browser agree.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Where the 27 expected verdicts come from<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Tidewater's hierarchy, people and policies are constructed, so no case is copied from Google. Each case instead applies one documented rule, quoted beside it in the table: the union of inherited allow policies, deny before allow, deny attachment points and inheritance, exception principals and exception permissions, a condition that turns false after a date, a <code>resource.name.startsWith</code> condition that fails for a sibling dataset, and "You cannot use conditions when you grant legacy basic roles", which the two binding cases test. Several cases are traps worth reading: c16, where a contractor may delete in the dev project because the deny sits on a different folder, and c27, where an exception principal is still not granted anything, because "exempt from the deny rule" is not the same as allowed.</p>
+      </div>
+    </details>
+  </section>
+
+  <section class="section" id="bench">
+    <div class="section-kicker">
+      <span class="klabel">Build-along · the IAM half</span>
+      <h2>Ask as Tidewater, then break the logic</h2>
+      <span class="tag demo">★ 12 min · the main event, part one</span>
+    </div>
+    <p class="lede">The bench opens on case 2: mei, an analyst, asks to read <code>sales_raw.orders</code>, which nothing grants her. Read the verdict and the trace. Switch on the anti-lever and read them again. Then walk the cases for raj (2 verdicts, 2 levels), the ingest service account (an exception and a condition), lin (a direct grant that loses to a deny) and ana (a grant that expires). Finish with the two break buttons and watch the table catch each one.</p>
+
+    <div id="gcp-iam-bench"></div>
+
+    <div class="callout tip">
+      <p><strong>Read it in this order.</strong> The verdict, then the step that decided it, then the count beside the anti-lever. Change the request time on ana's case to 2027 and watch the binding stop granting; change lin to zoe on the loyalty table and watch the exception lift the deny.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers the anti-lever and the break buttons</span>
+      <h2>One basic role, and two ways to be wrong</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">The anti-lever is the most common shortcut in real projects: someone is blocked, a deadline is close, and Editor goes on the project. Google's own advice is the opposite: basic roles "include thousands of permissions across all Google Cloud services. In production environments, do not grant basic roles unless there is no alternative." The break buttons are the opposite test: they make the evaluator wrong on purpose, so you can see that the 27 cases measure the logic and do not merely agree with it.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Top: two bars for mei's permissions on table sales_curated.orders out of 334 modelled. Without the anti-lever, 27, her Data Viewer grant. With roles/editor on the project, 320. Second pair: allowed requests across the 25 test requests rise from 10 to 13. Bottom: the 27 cases under three evaluators. Correct logic passes 27. Evaluating allow before deny passes 24 and fails c06, c12 and c21. Ignoring inheritance passes 13 and fails 14.">
+        <defs>
+          <filter id="b8bSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="67" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b8bHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+        </defs>
+        <style>
+          .b8bH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b8bL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b8bS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b8bV { font: 800 13px Inter, sans-serif; fill: #174EA6; }
+          .b8bR { font: 800 13px Inter, sans-serif; fill: #991B1B; }
+          .b8bN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+          .b8bW { font: 800 12px Inter, sans-serif; fill: #FFFFFF; }
+        </style>
+
+        <text class="b8bH" x="30" y="26">WHAT ONE roles/editor GRANT HANDS OVER (bar length = count)</text>
+
+        <g filter="url(#b8bSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="250" y="42" width="38" height="24" rx="3" fill="url(#b8bHc)"/>
+          <rect x="250" y="74" width="450" height="24" rx="3" fill="#FEF2F2" stroke="#991B1B"/>
+          <rect x="250" y="116" width="190" height="24" rx="3" fill="url(#b8bHc)"/>
+          <rect x="250" y="148" width="247" height="24" rx="3" fill="#FEF2F2" stroke="#991B1B"/>
+          <path d="M250 36 L250 178" stroke="#DADCE0"/>
+          <rect x="40" y="218" width="250" height="56" rx="10" transform="rotate(-0.6 165 246)" fill="#174EA6" stroke="#174EA6"/>
+          <rect x="315" y="218" width="250" height="56" rx="10" transform="rotate(0.5 440 246)" fill="#FBBC04"/>
+          <rect x="590" y="218" width="250" height="56" rx="10" transform="rotate(-0.4 715 246)" fill="#FBBC04"/>
+        </g>
+
+        <text class="b8bL" x="240" y="59" text-anchor="end">mei on sales_curated.orders</text>
+        <text class="b8bV" x="296" y="60">27</text>
+        <text class="b8bL" x="240" y="91" text-anchor="end">same, plus Editor on the project</text>
+        <text class="b8bR" x="708" y="92">320 of 334</text>
+        <text class="b8bL" x="240" y="133" text-anchor="end">25 test requests allowed</text>
+        <text class="b8bV" x="448" y="134">10</text>
+        <text class="b8bL" x="240" y="165" text-anchor="end">same, plus Editor for mei</text>
+        <text class="b8bR" x="505" y="166">13</text>
+
+        <text class="b8bH" x="30" y="206">THE SAME 27 CASES, THREE EVALUATORS</text>
+        <text class="b8bW" x="56" y="242">Correct logic</text>
+        <text class="b8bW" x="56" y="262">27 of 27 pass</text>
+        <text class="b8bH" x="331" y="242">Allow before deny</text>
+        <text class="b8bH" x="331" y="262">24 pass, 3 FAIL</text>
+        <text class="b8bH" x="606" y="242">Ignore inheritance</text>
+        <text class="b8bH" x="606" y="262">13 pass, 14 FAIL</text>
+        <text class="b8bN" x="30" y="304">A test suite earns trust by failing when the logic is wrong. Both break buttons are caught.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the red bars are the anti-lever: the read she was missing came with 293 more permissions on one table</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The anti-lever, with its honest nuance<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>With Editor on <code>tw-lake-prod</code>, the request that was not granted, mei reading <code>sales_raw.orders</code>, is allowed. So is almost everything else in the project: on one table her permissions go from 27 to 320 of the 334 the bench models, including deleting tables and models, updating routines and writing objects in the landing bucket. Across the 25 requests, allowed verdicts rise from 10 to 13.</p>
+        <p>The nuance matters: Editor does not beat a deny. Case c26, mei writing to a prod table, stays denied, because the project's deny rule on writes is checked before any allow is read. That is the real lesson of deny policies: they are the floor a hurried grant cannot lower. It is also why least privilege is a practice and not a slogan. The concepts behind it, roles, attributes and access reviews, are taught in <a href="https://phoebefu6.github.io/learn-data-access-control-with-phoebe/">data access control</a>. And the counts are modelled for Editor: the real role holds thousands of permissions across all services, so 320 is a floor, not a ceiling.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>What the break buttons prove<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>Evaluate allow before deny</strong> fails exactly the 3 cases where a deny meets an allow: raj's write to prod (c06), lin's direct grant on the pii table (c12) and sam's read of it under an organization-wide Viewer (c21). <strong>Ignore inheritance</strong> fails 14, every case decided by a grant or a deny above the resource itself, from the analysts' dataset grant (c01) to the contractor fence on the folder (c17). If either button had left the score at 27, the cases would be decoration. They are not.</p>
+      </div>
+    </details>
+  </section>
+
+  <section class="section" id="bench-cost">
+    <div class="section-kicker">
+      <span class="klabel">Build-along · the cost half</span>
+      <h2>Meter one question four ways</h2>
+      <span class="tag demo">★ 14 min · the main event, part two</span>
+    </div>
+    <p class="lede">The question is "average fare by pickup area in January 2019" on the public Chicago taxi table. The ladder asks it as <code>SELECT *</code>, then with three named columns, then against a copy partitioned by day, then against a copy that is also clustered by pickup area with a filter on Midway. Click a rung to select it, then set how often it runs and compare a month of on-demand with a slot reservation. Build your own query underneath from any of the 23 columns.</p>
+
+    <div id="gcp-cost-bench"></div>
+
+    <div class="callout tip">
+      <p><strong>Read it in this order.</strong> Processed bytes first, because they do not depend on any price, then billed, then dollars. Tick LIMIT 10 on any rung and watch nothing change. Select the clustered rung and notice that billed is larger than processed: that is the 10 MB minimum.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-3">
+    <div class="section-kicker">
+      <span class="klabel">Part 3 · covers how the meter computes bytes, and what is modelled</span>
+      <h2>Logical bytes, columns, partitions, blocks</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">BigQuery charges on-demand queries by "the total data processed in the columns you select", and it sizes that data by type: 8 logical bytes for INT64, FLOAT64 and TIMESTAMP, 2 plus the UTF-8 length for a STRING, and "A NULL value for any data type is calculated as 0 logical bytes". The meter applies exactly those rules to 18,362 real trips, averages per column, and scales by 211,670,894 / 18,362 = 11,527.7 to the full table. Then "Charges are rounded up to the nearest MB, with a minimum 10 MB data processed per table referenced by the query, and with a minimum 10 MB data processed per query."</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 350" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A staircase of four rungs, each bar's length showing bytes processed on a log-like hand-drawn scale. SELECT star: 23 columns times 211,670,894 rows, 77.03 GiB, 0.4701 dollars. Three named columns: 4.58 GiB, 0.0280 dollars. Partitioned by day, January 2019 only: 1,213,529 rows, 26.9 MB. Clustered by pickup area, Midway only: 36 of 257 modelled blocks, 172,753 rows, 3.8 MB processed but 10 MB billed. A side panel shows the column sizes: unique_key 42 bytes, taxi_id 130, pickup_location 34.3, fare 8.">
+        <defs>
+          <filter id="b8cSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="71" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b8cHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+        </defs>
+        <style>
+          .b8cH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b8cL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b8cS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b8cV { font: 800 13px Inter, sans-serif; fill: #174EA6; }
+          .b8cN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="b8cH" x="30" y="26">THE LADDER, COMPUTED BY THE METER (bars not to scale; the drop is 20,000-fold)</text>
+
+        <g filter="url(#b8cSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="48" width="560" height="34" rx="5" fill="url(#b8cHc)"/>
+          <rect x="30" y="106" width="300" height="34" rx="5" fill="url(#b8cHc)"/>
+          <rect x="30" y="164" width="130" height="34" rx="5" fill="#E8F0FE"/>
+          <rect x="30" y="222" width="54" height="34" rx="5" fill="#FBBC04"/>
+          <rect x="630" y="48" width="220" height="208" rx="10" transform="rotate(0.6 740 152)" fill="#FFFFFF"/>
+        </g>
+
+        <text class="b8cL" x="42" y="70">SELECT *</text>
+        <text class="b8cV" x="600" y="40">77.03 GiB · $0.4701</text>
+        <text class="b8cL" x="42" y="128">3 named columns</text>
+        <text class="b8cV" x="340" y="128">4.58 GiB · $0.0280</text>
+        <text class="b8cL" x="42" y="186">+ day</text>
+        <text class="b8cV" x="172" y="186">January 2019 partitions: 1,213,529 rows, 27 MB billed</text>
+        <text class="b8cV" x="96" y="244">Midway, 36 of 257 modelled blocks: 3.8 MB read, 10 MB billed</text>
+        <text class="b8cH" x="646" y="72">LOGICAL BYTES PER ROW</text>
+        <text class="b8cS" x="646" y="96">taxi_id (STRING)  130.0</text>
+        <text class="b8cS" x="646" y="118">unique_key (STRING)  42.0</text>
+        <text class="b8cS" x="646" y="140">pickup_location  34.3</text>
+        <text class="b8cS" x="646" y="162">company (STRING)  19.0</text>
+        <text class="b8cS" x="646" y="184">fare (FLOAT64)  8.0</text>
+        <text class="b8cS" x="646" y="206">pickup_census_tract  4.6</text>
+        <text class="b8cS" x="646" y="228">NULL counts 0 bytes</text>
+        <text class="b8cS" x="646" y="246">all 23 columns: 390.7</text>
+
+        <text class="b8cN" x="30" y="292">One wide hashed ID column, taxi_id, is a third of every row. Not reading it is the cheapest optimisation there is.</text>
+        <text class="b8cN" x="30" y="314">Per-row averages measured on the sample; the full-table byte counts are those averages times 211,670,894 rows.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow rung is the only modelled one: BigQuery does not publish its block layout</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Why clustering is modelled, and what the dry run tells you<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Partitions are exact: the January 2019 rung reads the portal's exact count of trips in those 31 days, 1,213,529. Clustering is not something Google lets you count in advance. "Clustered tables in BigQuery sort data in storage blocks based on the values in user-defined clustered columns", and "Because the number of blocks to scan isn't known until a query runs, you don't receive an accurate cost estimate before execution." The meter therefore models it: each day's trips, sorted by pickup area with NULLs first, cut into blocks of 5,000 rows, and a filter on area 56 reads every block that holds any Midway trip, 36 of 257. The real saving will differ. On a real clustered table, the dry run's estimate "is an upper bound, and can be higher than the actual number of bytes billed", which is also why a <code>maximum_bytes_billed</code> ceiling can stop a clustered query that would have fit.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>On-demand or slots: what the monthly panel assumes<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>At 200 runs a day, the <code>SELECT *</code> rung bills 451.32 TiB a month, $2,814.50 on demand after the free TiB, and the named-column rung 26.85 TiB, $161.55. The partitioned rung stays inside the free TiB. A 100-slot Standard reservation billed 8 hours a day for 30 days is $960.00 at $0.04 per slot-hour. That last number rests on an assumption the panel labels: real autoscaling "always autoscale[s] to a multiple of 50" and bills slot-seconds used, with a one-minute minimum, and whether 100 slots finish your workload in time is a performance question the meter does not answer. Standard edition also has "No access to BigQuery ML", which matters for session 7. Every price is the pricing page's default table, us-central1, read on 3 November 2026: re-verify before delivery.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The dashboard that read the hash column.</strong> A BI tool generated <code>SELECT *</code> behind every tile, so every refresh carried the wide identifier columns no chart ever showed. Replacing the tile queries with named columns and a date filter on a partitioned copy turned the dominant line of the bill into a rounding error. The story is a constructed composite; the byte counts are the meter's.</p>
+    </div>
+  </section>
+
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>After the bench</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li><strong>Find a case the evaluator gets "wrong" for your company.</strong> Pick one real grant at work, write it as a request, and list what the bench does not model that would change the verdict: a custom role, a principal access boundary, an organization policy.</li>
+      <li><strong>Price your own widest query.</strong> In "Your own query", tick the columns your busiest dashboard reads. Write down processed bytes with and without the partition filter.</li>
+      <li><strong>Find the break-even.</strong> Select the named-column rung and raise runs a day until on-demand passes the $960.00 reservation. Then write one sentence on why that number alone should not decide the purchase.</li>
+      <li><strong>Re-run the two numbers in the sandbox.</strong> Dry-run the session 2 query on the real table and compare its estimate with the meter's named-column rung. Note the difference, and which one you would trust for a budget.</li>
+    </ol>
+  </section>
+
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+    <p>Clear all three and builder session 8 gets stamped in your passport.</p>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">1 · lin has BigQuery Data Viewer granted directly on <code>loyalty_pii</code>, and an organization deny rule covers reads of pii-tagged data for everyone except privacy officers. What does IAM answer?</p>
+      <button class="qopt" type="button">A · Allowed, because a direct grant is more specific than an inherited deny</button>
+      <button class="qopt" type="button">B · Allowed, because allow policies are unioned</button>
+      <button class="qopt" type="button">C · Denied: "IAM always checks relevant deny policies before checking relevant allow policies"</button>
+      <button class="qopt" type="button">D · Not granted, because inherited policies do not reach datasets</button>
+      <p class="qwhy">Specificity does not exist in this model. The deny rule is inherited from the organization, lin is not an exception principal, the tag matches, so step 1 ends the evaluation (case c12).</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">2 · What do the two numbers beside the anti-lever say?</p>
+      <button class="qopt" type="button">A · The blocked read passes, and mei's permissions on one table go from 27 to 320 of 334 modelled, while the deny on prod writes still holds</button>
+      <button class="qopt" type="button">B · Editor fixes the read and changes nothing else</button>
+      <button class="qopt" type="button">C · Editor overrides every deny policy in the project</button>
+      <button class="qopt" type="button">D · Editor cannot be granted on a project</button>
+      <p class="qwhy">The two-number headline is the point: the fix and its cost. And because deny is checked first, case c26 stays denied with Editor in place.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="3">
+      <p class="qtext">3 · The clustered rung processes 3.8 MB but bills 10 MB. Why?</p>
+      <button class="qopt" type="button">A · Clustering adds a surcharge</button>
+      <button class="qopt" type="button">B · The meter rounds to the nearest GiB</button>
+      <button class="qopt" type="button">C · The free tier only covers 3.8 MB</button>
+      <button class="qopt" type="button">D · BigQuery bills "a minimum 10 MB data processed per table referenced by the query" and per query</button>
+      <p class="qwhy">Below 10 MB every query on one table bills the same. The cluster saving is real in bytes read but, at this size, invisible on the bill; and it is modelled, because the real block layout is not public.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What this session teaches, and where it came from</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Deny before allow; deny attachment and inheritance; deny rule fields; tag-only denial conditions</span><span class="note">IAM deny policies overview and permissions supported in deny policies, read at source on 3 November 2026</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Effective allow policy as a union up the hierarchy</span><span class="note">IAM policy inheritance and allow policies pages, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">IAM Conditions, CEL attributes, no conditions on legacy basic roles</span><span class="note">Overview of IAM Conditions; roles overview, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Permission lists of the eight predefined roles</span><span class="note">IAM roles reference for BigQuery and Cloud Storage, retrieved 3 November 2026</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Viewer, Editor and Owner contents</span><span class="note">Modelled from the documented definitions; the real lists are only in the console</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Data type sizes, NULL as 0 bytes, the 10 MB minimums, $6.25 per TiB, slot prices</span><span class="note">BigQuery data types reference and pricing page (us-central1 default table), read 3 November 2026; re-verify before delivery</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Clustering estimates are an upper bound; LIMIT does not cut bytes</span><span class="note">Clustered tables introduction; estimate and control costs, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">The trips and the row count</span><span class="note">City of Chicago, Taxi Trips (2013-2023), portal API, 3 November 2026; 18,362 sampled trips, exact January 2019 counts; Terms of Use notice on the widget</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Cluster blocks and the reservation month</span><span class="note">Modelled, labelled on the widget</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Tidewater's hierarchy, people, policies and the dashboard story</span><span class="note">Constructed</span></div>
+    </div>
+    <p class="mono" style="margin-top:14px">Every fact on this page, and its verification tier, is recorded in the course's source map.</p>
+  </section>
+
+  <section class="cheat" id="cheatsheet">
+    <h3>Builder session 8 cheat sheet <span>· pin this</span></h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>The order</b><span>Deny policies first, at any ancestor. Then allow, unioned up the tree. Else not granted.</span></div>
+      <div class="cheat-item"><b>Exceptions</b><span>An exception principal skips a deny rule. It never grants anything by itself.</span></div>
+      <div class="cheat-item"><b>The anti-lever</b><span>Editor on a project: 27 permissions on a table become 320. A deny still holds.</span></div>
+      <div class="cheat-item"><b>Logical bytes</b><span>Numbers and timestamps 8, strings 2 + length, NULL 0. Only the columns referenced.</span></div>
+      <div class="cheat-item"><b>The ladder</b><span>77.03 GiB, 4.58 GiB, 27 MB billed, then the 10 MB minimum. LIMIT changes nothing.</span></div>
+      <div class="cheat-item"><b>Modelled</b><span>Basic-role contents and cluster blocks. The dry run is an upper bound on clustered tables.</span></div>
+    </div>
+  </section>
+
+  <div class="callout next">
+    <span class="nx-pill">Next session</span>
+    <p>That is the builder track. Take the two engines back to work: one request your team argues about, one query your bill is made of. If you have not done the leader track, session 6, Tidewater's platform on one page, puts both halves of this bench into one architecture you can defend in a budget meeting.</p>
+  </div>
+
+  <footer class="pagefoot">
+    <span>Builder session 8 of 8 · learn-gcp-with-phoebe · by Phoebe Fu &nbsp;·&nbsp; 📚 <a href="https://phoebefu6.github.io/learn-with-phoebe/">Learn with Phoebe ↗</a></span>
+    <span><a href="b7-vertex-ai-and-bigquery-ml.html">← Prev: Vertex AI and BigQuery ML</a> &nbsp;·&nbsp; <a href="../index.html">Course home</a></span>
+  </footer>
+
+</main>
+
+<script src="../assets/gcp-iam.js?v=1"></script>
+<script src="../assets/gcp-iam-data.js?v=1"></script>
+<script src="../assets/gcp-cost.js?v=1"></script>
+<script src="../assets/gcp-sample.js?v=1"></script>
+<script src="../assets/gcp-bench.js?v=2"></script>
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

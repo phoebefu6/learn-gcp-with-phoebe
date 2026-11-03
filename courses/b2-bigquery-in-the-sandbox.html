@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Builder session 2 of 8. Open the BigQuery sandbox with no card, learn its limits, query the full Chicago taxi table, read the bytes a query will process before running it, and put a ceiling on what any one query may bill.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="BigQuery in the sandbox - learn gcp with phoebe">
+<meta property="og:description" content="Builder session 2 of 8. 1 TiB of queries a month, 10 GiB of lifetime storage, a dry run before every query and a maximum bytes billed ceiling.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/courses/b2-bigquery-in-the-sandbox.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BigQuery in the sandbox - learn gcp with phoebe">
+<meta name="twitter:description" content="Builder session 2 of 8. The sandbox, its limits, a dry run and a ceiling on bytes billed.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Builder session 2 · BigQuery in the sandbox - learn gcp with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=2">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-gcp-with-phoebe</a> / Builder session 2 of 8</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn GCP with Phoebe · Builder track · Session 2 of 8</div>
+    <h1>BigQuery in the <span class="accent">sandbox</span></h1>
+    <p class="sub">The BigQuery sandbox is a real BigQuery project with no card and no billing account behind it. Tonight you open one, learn exactly where its fences are, run your first query against the full Chicago taxi table of about 212 million rows, read how many bytes a query will process before you press Run, and set a ceiling so that no single query can bill more than you decided. Then you check the same SQL on your laptop against the sample from session 1.</p>
+    <div class="chip-row">
+      <span class="chip level">🟢 Foundations</span>
+      <span class="chip audience">Data engineers, analytics engineers, analysts who code</span>
+      <span class="chip audience">A Google account plus Python, no card</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:4">3-18 · Sandbox limits, bytes before running, a ceiling</span>
+      <span class="a3" style="flex:5">18-40 · Build-along: one query, two engines</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where we start</h2>
+    </div>
+    <p class="lede">Session 1 laid out files on your laptop the way Cloud Storage expects them. Tonight the same Chicago taxi trips sit in BigQuery at full size, in the public table <code>bigquery-public-data.chicago_taxi_trips.taxi_trips</code>, and you query them from the sandbox. Two habits come out of this session and stay for the rest of the builder track: you read the estimated bytes before you run anything, and you never run against a big table without a ceiling. Outputs from the sandbox are labelled "expected, your numbers will differ", because the public table and the console change; outputs from your laptop are pasted from a real run.</p>
+
+    <div class="legend">
+      <span class="pill">🎫 Clear all three quiz questions to stamp your passport</span>
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">★ Build-along = you make the artifact</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> A working BigQuery sandbox with one query against the full taxi table, the dry-run habit, a query setting that refuses to bill more than 1,000,000,000 bytes, and a laptop check of the same SQL on the 18,362-trip sample: Cash 872 trips at an average fare of 10.71, Credit Card 871 at 15.70.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers what the sandbox is and its limits</span>
+      <h2>A project with a fence instead of a card</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">Google's sandbox page puts it plainly: you can use BigQuery "without providing a credit card or creating a billing account for your project". What you get in exchange is a fence. Queries get "the same free compute limit as the BigQuery free tier of 1 TiB of processed query data each month". Storage is a "lifetime limit of 10 GiB". Tables, views and partitions "automatically expire after 60 days". Streaming data, DML statements and the BigQuery Data Transfer Service are not supported. The public datasets, in the project <code>bigquery-public-data</code>, sit outside the fence and are free to read into.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The sandbox drawn as a fenced project with no billing account. Inside the fence, four limits: 1 TiB of query processing a month, the same as the free tier; 10 GiB of storage for the project's lifetime, not refunded when data is deleted, highlighted; a 60-day expiry on tables, views and partitions; and not supported: streaming, DML and the Data Transfer Service. Outside the fence, the project bigquery-public-data with the chicago_taxi_trips.taxi_trips table, and an arrow from it into the sandbox, because queries can read public data.">
+        <defs>
+          <filter id="b2aSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="21" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b2aHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="b2aAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b2aH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b2aL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b2aS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b2aA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b2aN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="b2aH" x="30" y="26">THE SANDBOX: A REAL PROJECT, NO BILLING ACCOUNT, FOUR FENCES</text>
+
+        <g filter="url(#b2aSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="44" width="560" height="230" rx="12" transform="rotate(0.3 310 159)" fill="#E8F0FE"/>
+          <rect x="46" y="80" width="255" height="70" rx="8" transform="rotate(-1 173 115)" fill="#FFFFFF"/>
+          <rect x="318" y="80" width="255" height="70" rx="8" transform="rotate(1 445 115)" fill="#FBBC04"/>
+          <rect x="46" y="164" width="255" height="70" rx="8" transform="rotate(0.8 173 199)" fill="#FFFFFF"/>
+          <rect x="318" y="164" width="255" height="70" rx="8" transform="rotate(-0.8 445 199)" fill="#FFFFFF"/>
+          <rect x="640" y="110" width="210" height="90" rx="10" transform="rotate(-0.6 745 155)" fill="url(#b2aHc)"/>
+          <path d="M636 155 L600 155" marker-end="url(#b2aAr)"/>
+        </g>
+
+        <text class="b2aL" x="46" y="66">Your sandbox project: no card, no billing account</text>
+        <text class="b2aL" x="60" y="108">1 TiB of queries a month</text>
+        <text class="b2aS" x="60" y="128">same compute limit as the free tier</text>
+        <text class="b2aL" x="332" y="108">10 GiB of storage, lifetime</text>
+        <text class="b2aL" x="332" y="128">not refunded on deletion</text>
+        <text class="b2aL" x="60" y="192">60-day expiry</text>
+        <text class="b2aS" x="60" y="212">tables, views and partitions</text>
+        <text class="b2aL" x="332" y="190">Not supported</text>
+        <text class="b2aS" x="332" y="208">streaming, DML,</text>
+        <text class="b2aS" x="332" y="224">Data Transfer Service</text>
+        <text class="b2aS" x="46" y="260">Everything else is ordinary BigQuery: datasets, SQL, the console, the bq tool.</text>
+        <text class="b2aL" x="652" y="140">bigquery-public-data</text>
+        <text class="b2aS" x="652" y="160">chicago_taxi_trips.taxi_trips</text>
+        <text class="b2aA" x="640" y="222">queries reach in from the sandbox</text>
+
+        <text class="b2aN" x="30" y="300">Limits quoted from Try BigQuery using the sandbox, last updated 27 October 2026. Re-check before class.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow fence is the one that bites a class: storage is a lifetime budget, and deleting does not give it back</figcaption>
+    </figure>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>Setting it up<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Sign in to the Google Cloud console with any Google account and open BigQuery. If you have never attached a billing account, the console creates or picks a project for you and shows a sandbox banner at the top of the BigQuery page. That banner is your proof: there is no card behind this project, so there is nothing to overspend. You will not be asked for payment details at any point tonight.</p>
+        <p>In the Explorer panel, add the public project by name, <code>bigquery-public-data</code>, and open <code>chicago_taxi_trips</code>, then <code>taxi_trips</code>. The Schema tab shows the 23 columns you met in session 1; the Details tab shows the table's size. You are looking at the same rows as your 18,362-trip sample, at full size.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>What a "lifetime" 10 GiB means for a class<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The sandbox page says: "You are granted a lifetime limit of 10 GiB of storage. This quota is not refunded upon data deletion." Read that twice if you teach. A student who copies the whole taxi table into their own dataset to "have their own copy" will not fit, and a student who loads and deletes a few test tables has spent that storage for good. The professional habit follows: query public data in place, write only small result tables, and let the 60-day expiry clear them. When someone genuinely needs more, that is the moment to move to a billing-enabled project, not to work around the fence.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The workshop that ran out of storage on day two.</strong> A trainer asks every participant to load a few gigabytes of sample data into the sandbox, then delete it and load a cleaner version the next morning. The second load fails for half the room, because the deleted gigabytes still count. The story is a constructed composite; the rule behind it is Google's own wording, quoted above.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers the first query and reading bytes before running</span>
+      <h2>Read the bytes before you press Run</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">BigQuery on demand is charged by bytes processed, and BigQuery's storage is columnar: "You're charged according to the total data processed in the columns you select". So the price of a query is decided by the columns it names and the rows it must scan, and both are known before anything runs. The console's query validator shows an estimate as you type; the <code>bq</code> tool's dry run returns the same kind of figure. Google calls that estimate "an upper bound". Tonight's query names three of the table's 23 columns.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="On the left, the query editor holding tonight's SQL: payment type, a count of trips and the average fare, filtered to 2019 and grouped by payment type. Under the SQL, the validator strip that shows the estimated bytes before Run. An arrow leads to the table drawn as 23 column strips; three strips, trip_start_timestamp, payment_type and fare, are highlighted as the only columns read. A note says the estimate is an upper bound and that the bench's modelled three-column rung is 4.58 GiB, so this query should land in the same order.">
+        <defs>
+          <filter id="b2bSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="23" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b2bHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="b2bAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b2bH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b2bL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b2bS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b2bA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b2bN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="b2bH" x="30" y="26">THE ESTIMATE COMES FROM THE COLUMNS NAMED, BEFORE A BYTE IS READ</text>
+
+        <g filter="url(#b2bSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="44" width="380" height="200" rx="10" transform="rotate(-0.3 220 144)" fill="#FFFFFF"/>
+          <rect x="46" y="190" width="348" height="38" rx="6" fill="#E8F0FE"/>
+          <rect x="460" y="60" width="390" height="150" rx="8" transform="rotate(0.3 655 135)" fill="url(#b2bHc)"/>
+          <path d="M477 60 L477 210 M494 60 L494 210 M528 60 L528 210 M545 60 L545 210 M562 60 L562 210 M579 60 L579 210 M596 60 L596 210 M613 60 L613 210 M681 60 L681 210 M698 60 L698 210 M715 60 L715 210 M732 60 L732 210 M749 60 L749 210 M766 60 L766 210 M783 60 L783 210 M800 60 L800 210 M817 60 L817 210 M834 60 L834 210" stroke="#1A73E8"/>
+          <rect x="512" y="66" width="14" height="138" rx="3" fill="#FBBC04"/>
+          <rect x="631" y="66" width="14" height="138" rx="3" fill="#FBBC04"/>
+          <rect x="665" y="66" width="14" height="138" rx="3" fill="#FBBC04"/>
+          <path d="M414 140 L452 140" marker-end="url(#b2bAr)"/>
+        </g>
+
+        <text class="b2bS" x="46" y="68">SELECT payment_type, COUNT(*) AS trips,</text>
+        <text class="b2bS" x="46" y="86">  ROUND(AVG(fare), 2) AS avg_fare</text>
+        <text class="b2bS" x="46" y="104">FROM ...chicago_taxi_trips.taxi_trips</text>
+        <text class="b2bS" x="46" y="122">WHERE trip_start_timestamp &gt;= 2019-01-01</text>
+        <text class="b2bS" x="46" y="140">  AND trip_start_timestamp &lt; 2020-01-01</text>
+        <text class="b2bS" x="46" y="158">GROUP BY payment_type ORDER BY trips DESC</text>
+        <text class="b2bL" x="58" y="214">validator: estimated bytes, shown before Run</text>
+        <text class="b2bA" x="460" y="232">3 of 23 columns read, every row of each</text>
+        <text class="b2bS" x="460" y="252">trip_start_timestamp, payment_type, fare</text>
+
+        <text class="b2bN" x="30" y="288">The estimate is an upper bound. The bench's modelled three-column rung is 4.58 GiB, a different trio of columns,</text>
+        <text class="b2bN" x="30" y="306">so expect the same order of size here; your own dry run gives the real figure.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the WHERE clause does not shrink the estimate on this table: it is not partitioned, so every row of the three columns is read</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The dry run, from the command line<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A dry run validates the query and reports the bytes it would process, without running it and without charge. In the console, the validator does this as you type. From a terminal with the Google Cloud CLI installed, the same check is <code>bq query --dry_run --use_legacy_sql=false '...'</code>. Make it a reflex before any query on a table you have not measured.</p>
+        <p>Notice what the estimate is built from: the columns you named and the rows the table must scan. The <code>WHERE</code> on the year filters rows out of the result, but on an unpartitioned table every row of those three columns is still read. Session 3 is where a filter starts to cut bytes, through partitions. For a feel of the size: the bench in session 8 models a three-column query over the full 211,670,894 rows at 4.58 GiB; it reads <code>pickup_community_area</code> where tonight's query reads <code>payment_type</code>, so treat it as the same order, not the same number.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Where the estimate can mislead you<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Three cases worth knowing. First, the estimate "is an upper bound": on clustered tables BigQuery only learns how many blocks it can skip while the query runs, so the real figure can be lower. Second, dry runs return 0 bytes on tables with row-level security, so a zero there means "not estimated", not "free". Third, <code>LIMIT</code> does not help: "applying a LIMIT clause to a query doesn't affect the amount of data that is read." Only fewer columns or fewer partitions do. The byte count itself follows BigQuery's documented logical sizes per data type (8 bytes for an INT64 or FLOAT64, 2 bytes plus the length for a STRING), not the compressed size on disk.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The <code>SELECT * ... LIMIT 10</code> preview.</strong> An analyst new to BigQuery "peeks" at a large table with <code>SELECT * LIMIT 10</code>, expecting a tiny read, and burns a noticeable slice of the month's free terabyte on one look. The table's Preview tab would have shown the same rows without a query. The story is a constructed composite; the LIMIT rule is Google's.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-3">
+    <div class="section-kicker">
+      <span class="klabel">Part 3 · covers putting a ceiling on a query</span>
+      <h2>A ceiling on every query</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">Reading the estimate is a habit; a ceiling is a guarantee. The query setting <code>maximum_bytes_billed</code> tells BigQuery the most a query may bill. If the query would bill more, Google's cost page says "the query fails without incurring a charge". It is the cheapest insurance in BigQuery, and it costs nothing to set in the sandbox, where it protects your free terabyte.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 345" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A dashed ceiling line marks maximum bytes billed, set to 1,000,000,000 bytes. Three queries are drawn as bars against it. A three-column query on one partitioned month sits under the ceiling and runs, billed on bytes read. SELECT star on the full table rises far above the ceiling and fails before running, with no charge. A query on a clustered table has a dashed estimate bar above the ceiling and a smaller actual bar inside it below the ceiling; it still fails, because the check uses the estimate, which is an upper bound.">
+        <defs>
+          <filter id="b2cSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="29" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b2cHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+        </defs>
+        <style>
+          .b2cH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b2cL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b2cS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b2cA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+        </style>
+
+        <text class="b2cH" x="30" y="26">ONE CEILING, THREE QUERIES (BAR HEIGHTS ILLUSTRATIVE, NOT TO SCALE)</text>
+
+        <g filter="url(#b2cSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="134" width="170" height="32" rx="6" transform="rotate(-1 115 150)" fill="#FBBC04"/>
+          <rect x="250" y="200" width="120" height="70" rx="6" transform="rotate(0.6 310 235)" fill="#E8F0FE"/>
+          <rect x="450" y="70" width="120" height="200" rx="6" transform="rotate(-0.5 510 170)" fill="url(#b2cHc)"/>
+          <rect x="680" y="90" width="120" height="180" rx="6" fill="#FFFFFF" stroke-dasharray="6 5"/>
+          <rect x="696" y="178" width="88" height="88" rx="5" fill="url(#b2cHc)"/>
+          <path d="M210 150 L860 150" stroke="#174EA6" stroke-dasharray="8 6"/>
+          <path d="M230 270 L860 270"/>
+        </g>
+
+        <text class="b2cL" x="42" y="155">max bytes billed</text>
+        <text class="b2cS" x="30" y="186">set to 1,000,000,000 bytes</text>
+        <text class="b2cA" x="30" y="204">the check uses the estimate</text>
+        <text class="b2cS" x="692" y="112">estimate</text>
+        <text class="b2cS" x="706" y="200">actual</text>
+
+        <text class="b2cL" x="250" y="292">partitioned, one month</text>
+        <text class="b2cS" x="250" y="310">runs, billed on bytes read</text>
+        <text class="b2cL" x="450" y="292">SELECT * on full table</text>
+        <text class="b2cS" x="450" y="310">fails first, no charge</text>
+        <text class="b2cL" x="680" y="292">clustered table</text>
+        <text class="b2cS" x="680" y="310">estimate over, actual under:</text>
+        <text class="b2cS" x="680" y="328">still fails, no charge</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the dashed line is the setting: a query is judged on its estimate, so a clustered table can be refused even when the real read would have fitted</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Set it in the console or on the command line<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>In the console, the query settings carry a Maximum bytes billed field. On the command line, pass <code>--maximum_bytes_billed=1000000000</code> to <code>bq query</code>. A billion bytes is a constructed teaching value: large enough for tonight's three-column query on a partitioned table, small enough to stop a <code>SELECT *</code> on the full taxi table. Pick yours from your own dry runs.</p>
+        <p>One trap from Google's estimate page: for clustered tables the pre-run estimate is an upper bound, so a query can fail against the ceiling even though the bytes it would actually have read fit under it. When that happens, raise the ceiling for that query on purpose, rather than removing it.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Custom quotas: the project-wide version<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A per-query ceiling protects against one bad query. A custom quota protects against a bad day. BigQuery has two: <code>QueryUsagePerDay</code> for the whole project, whose default is "200 Tebibytes (TiB) of data processed per project per day", and <code>QueryUsagePerUserPerDay</code>, unlimited by default. Google warns that when the project quota is hit, "BigQuery stops working for everyone in that project" until it resets, so the per-user quota is usually the kinder lever. Leader session 5, <a href="a5-the-bytes-behind-the-bill.html">The bytes behind the bill</a>, puts both next to budgets and spend caps.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The dashboard that refreshed every minute.</strong> A team wires a dashboard to an unpartitioned table and sets it to refresh every minute. Nothing breaks, so nobody looks, until the month's bill. A ceiling on the dashboard's service account would have turned the first expensive refresh into a visible error. The story is a constructed composite.</p>
+    </div>
+  </section>
+
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>One query, two engines</h2>
+      <span class="tag demo">★ 22 min · everyone builds</span>
+    </div>
+    <p class="lede">You run one SQL query twice: in the sandbox against the full table, and on your laptop against the sample with DuckDB. The sandbox shows you the real platform; the laptop run proves the logic with a result you can compare line for line with the output pasted below. The two will not match in numbers, and they should not: one is about 212 million rows, the other 18,362.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="One SQL query, grouped by payment type, goes to two engines. The BigQuery sandbox runs it on the full table of 211,670,894 rows and returns the expected shape, one row per payment type, with numbers that will differ for you. DuckDB on the laptop runs it on the 18,362-trip sample, of which 1,800 trips fall in 2019, and returns the real output pasted below: Cash 872, Credit Card 871.">
+        <defs>
+          <filter id="b2dSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="31" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="b2dHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="b2dAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b2dL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b2dS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b2dN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#b2dSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="86" width="170" height="60" rx="8" transform="rotate(-1.5 115 116)" fill="#FBBC04"/>
+          <rect x="290" y="40" width="260" height="64" rx="8" transform="rotate(0.6 420 72)" fill="#E8F0FE"/>
+          <rect x="290" y="130" width="260" height="64" rx="8" transform="rotate(-0.6 420 162)" fill="#FFFFFF"/>
+          <rect x="620" y="40" width="230" height="64" rx="8" transform="rotate(-0.8 735 72)" fill="url(#b2dHc)"/>
+          <rect x="620" y="130" width="230" height="64" rx="8" transform="rotate(0.8 735 162)" fill="#FFFFFF"/>
+          <path d="M204 108 L282 76" marker-end="url(#b2dAr)"/>
+          <path d="M204 124 L282 160" marker-end="url(#b2dAr)"/>
+          <path d="M554 72 L612 72" marker-end="url(#b2dAr)"/>
+          <path d="M554 162 L612 162" marker-end="url(#b2dAr)"/>
+        </g>
+
+        <text class="b2dL" x="44" y="112">one SQL query</text>
+        <text class="b2dL" x="44" y="130">GROUP BY payment_type</text>
+        <text class="b2dL" x="304" y="66">BigQuery sandbox</text>
+        <text class="b2dS" x="304" y="86">full table, 211,670,894 rows</text>
+        <text class="b2dL" x="304" y="156">DuckDB on your laptop</text>
+        <text class="b2dS" x="304" y="176">18,362-trip sample, 1,800 in 2019</text>
+        <text class="b2dL" x="634" y="66">expected shape</text>
+        <text class="b2dS" x="634" y="86">your numbers will differ</text>
+        <text class="b2dL" x="634" y="156">real output below</text>
+        <text class="b2dS" x="634" y="176">Cash 872, Credit Card 871</text>
+
+        <text class="b2dN" x="30" y="216">Same SQL, same shape of answer: one row per payment type, busiest first. Only the laptop numbers are pasted from a run.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow box is the point: the SQL you test on a laptop is the SQL you run in BigQuery</figcaption>
+    </figure>
+
+    <div class="callout tip">
+      <p><strong>In the sandbox.</strong> Runs in the BigQuery sandbox: no card, no billing account. Steps 1 to 3 run there; every sandbox output on this page is labelled "expected, your numbers will differ", because the public table and the console can change between the day these pages were written and the day you run them.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>Run the query in the sandbox.</strong> Paste it into a new query tab. Before you press Run, read the validator's estimate and write it down; you will need it in step 3.</p>
+        <div class="prompt-box good"><span class="label">★ Step 1 · sandbox SQL</span>SELECT payment_type,
+       COUNT(*)            AS trips,
+       ROUND(AVG(fare), 2) AS avg_fare
+FROM `bigquery-public-data.chicago_taxi_trips.taxi_trips`
+WHERE trip_start_timestamp &gt;= TIMESTAMP '2019-01-01'
+  AND trip_start_timestamp &lt;  TIMESTAMP '2020-01-01'
+GROUP BY payment_type
+ORDER BY trips DESC</div>
+        <div class="prompt-box good"><span class="label">★ Step 1 · sandbox output (expected, your numbers will differ)</span>payment_type   trips   avg_fare
+Cash           ...     ...
+Credit Card    ...     ...
+...            one row per payment type, busiest first;
+               Cash and Credit Card are the two largest rows</div>
+      </div>
+      <div class="step">
+        <p><strong>Dry-run the same query from a terminal (optional).</strong> If you have the Google Cloud CLI installed and signed in to your sandbox project, the dry run prints the bytes the query would process and runs nothing. It should agree with the validator.</p>
+        <div class="prompt-box good"><span class="label">★ Step 2 · dry run (expected, your numbers will differ)</span>bq query --dry_run --use_legacy_sql=false \
+'SELECT payment_type, COUNT(*) AS trips, ROUND(AVG(fare), 2) AS avg_fare
+ FROM `bigquery-public-data.chicago_taxi_trips.taxi_trips`
+ WHERE trip_start_timestamp &gt;= TIMESTAMP "2019-01-01"
+   AND trip_start_timestamp &lt;  TIMESTAMP "2020-01-01"
+ GROUP BY payment_type ORDER BY trips DESC'
+
+# prints the bytes it would process; compare with the validator from step 1</div>
+      </div>
+      <div class="step">
+        <p><strong>Put a ceiling on it.</strong> In the console, fill in Maximum bytes billed in the query settings. Or on the command line, as below. Then try a <code>SELECT *</code> on the same table under the same ceiling and watch it fail before it starts.</p>
+        <div class="prompt-box good"><span class="label">★ Step 3 · ceiling (expected, your numbers will differ)</span>bq query --use_legacy_sql=false --maximum_bytes_billed=1000000000 \
+'SELECT payment_type, COUNT(*) AS trips
+ FROM `bigquery-public-data.chicago_taxi_trips.taxi_trips`
+ GROUP BY payment_type'
+
+# if the estimate from step 1 is above 1,000,000,000 bytes, this fails
+# without a charge; raise the ceiling on purpose, or read fewer columns</div>
+      </div>
+      <div class="step">
+        <p><strong>Check the logic on your laptop.</strong> Use session 1's environment and its sample file; if you are starting fresh, recreate it with the same pins. DuckDB 2.0.0 reads the Parquet file directly and accepts the same SQL, with a local view standing in for the BigQuery table name.</p>
+        <div class="prompt-box good"><span class="label">★ Step 4 · setup, from session 1's environment (Python 3.11)</span>. .venv/bin/activate
+pip install duckdb==2.0.0
+# the sample from session 1: chicago_taxi_sample.parquet in this folder</div>
+        <div class="prompt-box good"><span class="label">★ Step 4 · b2_sandbox_check.py, part 1</span># Builder session 2: check the sandbox query's LOGIC on the shipped sample with DuckDB.
+# The numbers differ from BigQuery's full table: the sample is 18,362 trips, the table about 212 million.
+# Needs: pip install duckdb==2.0.0
+import sys, duckdb
+SRC = sys.argv[1] if len(sys.argv) &gt; 1 else "chicago_taxi_sample.parquet"
+con = duckdb.connect()
+con.execute(f"CREATE VIEW taxi_trips AS SELECT * FROM '{SRC}'")</div>
+        <div class="prompt-box good"><span class="label">★ Step 4 · b2_sandbox_check.py, part 2</span>sql = """
+SELECT payment_type,
+       COUNT(*)            AS trips,
+       ROUND(AVG(fare), 2) AS avg_fare
+FROM taxi_trips
+WHERE trip_start_timestamp &gt;= TIMESTAMP '2019-01-01'
+  AND trip_start_timestamp &lt;  TIMESTAMP '2020-01-01'
+GROUP BY payment_type
+ORDER BY trips DESC
+"""
+for row in con.execute(sql).fetchall():
+    print(f"{row[0]:12s} {row[1]:&gt;6d} {row[2]:&gt;8.2f}")</div>
+      </div>
+      <div class="step">
+        <p><strong>Run it and compare with this real output.</strong> The sample has only 1,800 trips in 2019, twelve 15-minute slots of 150 trips each, so the counts are tiny and the averages are not the full year's. What should match the sandbox is the shape: the same payment types, Cash and Credit Card on top. Note the logic check found a real quirk of the data, too: <code>Prcard</code>, <code>Unknown</code> and <code>No Charge</code> are payment types in their own right, which any report on payment mix has to decide how to treat.</p>
+        <div class="prompt-box good"><span class="label">★ Step 5 · python b2_sandbox_check.py (real output)</span>Cash            872    10.71
+Credit Card     871    15.70
+Mobile           23    21.03
+Prcard           15    12.25
+Unknown          10    17.17
+No Charge         7    36.86
+Dispute           2     5.00</div>
+      </div>
+    </div>
+
+    <div class="prompt-box bad"><span class="label">✗ The query that spends the month's terabyte on a peek</span>SELECT *
+FROM `bigquery-public-data.chicago_taxi_trips.taxi_trips`
+LIMIT 10        -- LIMIT does not reduce the bytes read; all 23 columns are scanned</div>
+
+    <p class="mono" style="margin-top:14px">Data notice, as the City of Chicago's Terms of Use require: This site provides applications using data that has been modified for use from its original source, www.cityofchicago.org, the official website of the City of Chicago. The City of Chicago makes no claims as to the content, accuracy, timeliness, or completeness of any of the data provided at this site. The data provided at this site is subject to change at any time. It is understood that the data provided at this site is being used at one's own risk.</p>
+  </section>
+
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 3</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li><strong>Dry-run three versions of the query.</strong> Tonight's three columns, the same with <code>company</code> added, and <code>SELECT *</code>. Write the three estimates side by side and explain the jumps from the columns alone.</li>
+      <li><strong>Prove LIMIT does nothing to bytes.</strong> Dry-run <code>SELECT fare FROM ... LIMIT 10</code> and <code>SELECT fare FROM ...</code>. Compare the two estimates.</li>
+      <li><strong>Pick your own ceiling.</strong> From your dry runs, choose a maximum bytes billed that lets your normal queries through and stops a <code>SELECT *</code>. Write down why you chose it.</li>
+      <li><strong>Change the year in the laptop script.</strong> Edit the dates to 2015 and rerun <code>b2_sandbox_check.py</code>. Which payment types appear that did not appear in 2019?</li>
+    </ol>
+  </section>
+
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+    <p>Clear all three and builder session 2 gets stamped in your passport.</p>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">1 · A student loads 6 GiB into the sandbox, deletes it, and tries to load 6 GiB again. What happens?</p>
+      <button class="qopt" type="button">A · It works: deleting data frees the space</button>
+      <button class="qopt" type="button">B · It does not fit: the sandbox has a lifetime limit of 10 GiB of storage, and the quota is not refunded upon data deletion</button>
+      <button class="qopt" type="button">C · It works, but the tables expire after 7 days</button>
+      <button class="qopt" type="button">D · The sandbox asks for a card to continue</button>
+      <p class="qwhy">The sandbox page says the 10 GiB storage limit is lifetime and "not refunded upon data deletion". Query public data in place and keep your own tables small.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="3">
+      <p class="qtext">2 · A query's estimate is above the maximum bytes billed you set. What happens?</p>
+      <button class="qopt" type="button">A · It runs and bills up to the ceiling, then stops</button>
+      <button class="qopt" type="button">B · It runs in full and sends you an alert</button>
+      <button class="qopt" type="button">C · It runs on a sample of the table instead</button>
+      <button class="qopt" type="button">D · It fails without incurring a charge</button>
+      <p class="qwhy">Google's cost page: if the query would bill more than the setting, "the query fails without incurring a charge". Nothing is read and nothing is billed.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">3 · Why is a dry run's estimate called an upper bound, especially for clustered tables?</p>
+      <button class="qopt" type="button">A · Clustering lets BigQuery skip blocks, but how many it can skip is only known while the query runs, so the real bytes can come in under the estimate</button>
+      <button class="qopt" type="button">B · Dry runs always double the real figure to be safe</button>
+      <button class="qopt" type="button">C · Dry runs ignore the WHERE clause on every table</button>
+      <button class="qopt" type="button">D · Clustered tables are billed on compressed bytes</button>
+      <p class="qwhy">The block pruning happens at run time, so the estimate assumes the worst. A side effect: a ceiling can refuse a clustered-table query whose actual read would have fitted.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What this session teaches, and where it came from</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Sandbox: no card, 1 TiB a month, 10 GiB lifetime storage not refunded, 60-day expiry, unsupported features</span><span class="note">Try BigQuery using the sandbox, last updated 27 October 2026, read at source on 3 November 2026</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Columnar charging, the upper-bound estimate, 0-byte dry runs on row-level-secured tables</span><span class="note">BigQuery pricing; Estimate and control costs, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Maximum bytes billed, LIMIT does not reduce bytes, custom quotas</span><span class="note">Estimate and control costs (best practices); Create custom query quotas, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Logical sizes per data type</span><span class="note">BigQuery data types, data type sizes, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">The laptop logic check</span><span class="note">Real run of b2_sandbox_check.py, duckdb 2.0.0, Python 3.11, on the shipped 18,362-trip sample</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">The 4.58 GiB comparison and the 1,000,000,000-byte ceiling</span><span class="note">Modelled (the bench's three-column rung) and constructed (a teaching value); sandbox outputs are expected, not run</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Workshop, preview and dashboard stories</span><span class="note">Constructed composites</span></div>
+    </div>
+    <p class="mono" style="margin-top:14px">Every fact on this page, and its verification tier, is recorded in the course's source map.</p>
+  </section>
+
+  <section class="cheat" id="cheatsheet">
+    <h3>Builder session 2 cheat sheet <span>· pin this</span></h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>Sandbox</b><span>No card, no billing account. 1 TiB of queries a month, 10 GiB storage for life.</span></div>
+      <div class="cheat-item"><b>Expiry</b><span>Tables, views and partitions expire after 60 days. No streaming, DML or Data Transfer Service.</span></div>
+      <div class="cheat-item"><b>Before Run</b><span>Read the validator, or <code>bq query --dry_run</code>. It is an upper bound.</span></div>
+      <div class="cheat-item"><b>What costs</b><span>Columns named times rows scanned. LIMIT and WHERE on an unpartitioned table do not cut it.</span></div>
+      <div class="cheat-item"><b>Ceiling</b><span><code>--maximum_bytes_billed</code>: over it, the query fails with no charge.</span></div>
+      <div class="cheat-item"><b>Project-wide</b><span><code>QueryUsagePerUserPerDay</code> and <code>QueryUsagePerDay</code> custom quotas.</span></div>
+    </div>
+  </section>
+
+  <div class="callout next">
+    <span class="nx-pill">Next session</span>
+    <p>Tonight the WHERE clause on the year filtered the answer but not the bill. Session 3 makes it cut the bill: partitioning by day, clustering inside each partition, and a measured ladder from <code>SELECT *</code> to a query that reads a few megabytes.</p>
+  </div>
+
+  <footer class="pagefoot">
+    <span>Builder session 2 of 8 · learn-gcp-with-phoebe · by Phoebe Fu &nbsp;·&nbsp; 📚 <a href="https://phoebefu6.github.io/learn-with-phoebe/">Learn with Phoebe ↗</a></span>
+    <span><a href="b1-cloud-storage-layout-and-parquet.html">← Prev: Cloud Storage layout and Parquet</a> &nbsp;·&nbsp; <a href="b3-partitioning-and-clustering.html">Next: Partitioning and clustering →</a></span>
+  </footer>
+
+</main>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

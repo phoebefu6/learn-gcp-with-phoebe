@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Leader session 4 of 6. Four ways to move and transform data on Google Cloud without running a server: scheduled SQL, Dataflow, Managed Service for Apache Spark and Cloud Run functions, plus events with Pub/Sub and a decision guide by workload.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="Pipelines without servers - learn gcp with phoebe">
+<meta property="og:description" content="Leader session 4 of 6. Four routes into BigQuery, each on its own meter. Pub/Sub delivers at least once, so every pipeline must survive the same message twice.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/courses/a4-pipelines-without-servers.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Pipelines without servers - learn gcp with phoebe">
+<meta name="twitter:description" content="Leader session 4 of 6. Scheduled SQL, Dataflow, Managed Spark, Cloud Run functions and Pub/Sub, chosen by workload.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Leader session 4 · Pipelines without servers - learn gcp with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=2">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-gcp-with-phoebe</a> / Leader session 4 of 6</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn GCP with Phoebe · Leader track · Session 4 of 6</div>
+    <h1>Pipelines <span class="accent">without servers</span></h1>
+    <p class="sub">Data does not arrive in BigQuery on its own. Files land, events fire, tables need rebuilding every night. Google Cloud offers at least four ways to do that work without anyone running a server, and each one bills on a different meter. Tonight we draw the four routes, follow an event through Pub/Sub, and finish with a short guide for choosing a route by the shape of the work rather than by whoever on the team knows the tool.</p>
+    <div class="chip-row">
+      <span class="chip level">🟡 Core</span>
+      <span class="chip audience">Data and AI leaders, managers, architects</span>
+      <span class="chip audience">No code, no account</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:4">3-18 · Four routes, events, the choice</span>
+      <span class="a3" style="flex:5">18-40 · Build-along: route Tidewater's five flows</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where we start</h2>
+    </div>
+    <p class="lede">Session 3 ended with the pipeline's own identity, the service account ingest-pipeline, and the grants it holds. Tonight we look at what that pipeline actually runs on. The leader's question is not "which tool is best?" but "which tool fits this flow, and which meter will it run on?". How to design a pipeline well, its stages, contracts and tests, is taught in <a href="https://phoebefu6.github.io/learn-data-pipelines-with-phoebe/">Learn Data Pipelines with Phoebe</a> and <a href="https://phoebefu6.github.io/learn-data-engineering-with-phoebe/">Learn Data Engineering with Phoebe</a>. Here we stay with the Google Cloud services and when each one is the right call.</p>
+
+    <div class="legend">
+      <span class="pill">🎫 Clear all three quiz questions to stamp your passport</span>
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">★ Build-along = you make the artifact</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> Tidewater's five data flows, each assigned a route, a meter and an owner on one sheet, and the same sheet started for your own flows. And one rule to repeat in design reviews: Pub/Sub's default is "at-least-once delivery with no ordering guarantees", so every pipeline fed by events must give the same answer when a message arrives twice.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers the four ways to move and transform data</span>
+      <h2>Four routes into BigQuery</h2>
+      <span class="tag concept">6 min live</span>
+    </div>
+    <p class="lede">Take one input: Tidewater's point-of-sale files landing in gs://tw-lake-prod-landing every night. There are four common ways to get them shaped and into BigQuery, and none of them asks you to patch a machine. They differ in what they are good at, in who on your team can maintain them, and above all in the meter each one runs on.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="On the left, the constructed landing files in the bucket tw-lake-prod-landing. Four routes fan out to BigQuery on the right. Route one, highlighted: scheduled SQL inside BigQuery, using BigQuery Data Transfer Service, billed by bytes read or slot-hours. Route two: Dataflow running Apache Beam, billed for worker vCPU and memory per second per job. Route three: Managed Service for Apache Spark, formerly Dataproc, on clusters or serverless, billed for cluster or serverless time. Route four: a Cloud Run function per file, billed by requests and compute seconds.">
+        <defs>
+          <filter id="a4aSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="113" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <pattern id="a4aHc" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1A73E8" stroke-width="1" opacity=".5"/></pattern>
+          <marker id="a4aAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .a4aH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .a4aL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .a4aS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a4aA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .a4aN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="a4aH" x="30" y="26">FOUR ROUTES FROM THE SAME LANDING FILES INTO BIGQUERY (TIDEWATER, CONSTRUCTED)</text>
+
+        <g filter="url(#a4aSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="140" width="170" height="100" rx="10" transform="rotate(-1 115 190)" fill="#E8F0FE"/>
+          <rect x="46" y="218" width="138" height="14" rx="3" fill="url(#a4aHc)"/>
+          <rect x="290" y="46" width="330" height="62" rx="10" transform="rotate(0.6 455 77)" fill="#FBBC04"/>
+          <rect x="290" y="126" width="330" height="62" rx="10" transform="rotate(-0.6 455 157)" fill="#FFFFFF"/>
+          <rect x="290" y="206" width="330" height="62" rx="10" transform="rotate(0.5 455 237)" fill="#FFFFFF"/>
+          <rect x="290" y="286" width="330" height="62" rx="10" transform="rotate(-0.5 455 317)" fill="#FFFFFF"/>
+          <path d="M204 190 C 240 190, 250 77, 284 77" marker-end="url(#a4aAr)"/>
+          <path d="M204 190 C 240 190, 250 157, 284 157" marker-end="url(#a4aAr)"/>
+          <path d="M204 190 C 240 190, 250 237, 284 237" marker-end="url(#a4aAr)"/>
+          <path d="M204 190 C 240 190, 250 317, 284 317" marker-end="url(#a4aAr)"/>
+          <rect x="700" y="130" width="150" height="120" rx="12" transform="rotate(0.8 775 190)" fill="#FFFFFF"/>
+          <path d="M624 77 C 660 77, 670 190, 696 190" marker-end="url(#a4aAr)"/>
+          <path d="M624 157 C 660 157, 670 190, 696 190" marker-end="url(#a4aAr)"/>
+          <path d="M624 237 C 660 237, 670 190, 696 190" marker-end="url(#a4aAr)"/>
+          <path d="M624 317 C 660 317, 670 190, 696 190" marker-end="url(#a4aAr)"/>
+        </g>
+
+        <text class="a4aL" x="46" y="166">landing files</text>
+        <text class="a4aS" x="46" y="186">gs://tw-lake-prod-</text>
+        <text class="a4aS" x="46" y="202">landing/sales/dt=.../</text>
+
+        <text class="a4aL" x="306" y="70">Scheduled SQL inside BigQuery</text>
+        <text class="a4aL" x="306" y="90">meter: bytes read or slot-hours</text>
+        <text class="a4aL" x="306" y="150">Dataflow running Apache Beam</text>
+        <text class="a4aS" x="306" y="170">meter: vCPU and memory, per second, per job</text>
+        <text class="a4aL" x="306" y="230">Managed Service for Apache Spark</text>
+        <text class="a4aS" x="306" y="250">formerly Dataproc; cluster or serverless time</text>
+        <text class="a4aL" x="306" y="310">Cloud Run function, one call per file</text>
+        <text class="a4aS" x="306" y="330">meter: requests and compute seconds</text>
+
+        <text class="a4aL" x="716" y="166">BigQuery</text>
+        <text class="a4aS" x="716" y="186">sales_raw,</text>
+        <text class="a4aS" x="716" y="202">sales_curated</text>
+        <text class="a4aA" x="716" y="226">tw-lake-prod</text>
+
+        <text class="a4aN" x="30" y="370">Scheduled SQL reads the files through an external or BigLake table (session 2). Constructed flows.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow route is the default when the data already sits in BigQuery: no new service, the same meter you already watch</figcaption>
+    </figure>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>The four routes, in Google's words<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>Scheduled SQL.</strong> A SQL statement BigQuery runs on a timetable. "Scheduled queries use features of BigQuery Data Transfer Service". It bills like any other query: bytes read on demand, or slot-hours on capacity. If the work is SQL and the data is already in BigQuery, nothing else needs to exist.</p>
+        <p><strong>Dataflow.</strong> "Dataflow is a Google Cloud service that provides unified stream and batch data processing at scale", and "Dataflow executes Apache Beam pipelines." It bills worker vCPU and memory, shuffle data and, for streaming, Streaming Engine; usage "is billed in per second increments, on a per job basis".</p>
+        <p><strong>Managed Service for Apache Spark (formerly Dataproc).</strong> Google's banner: the new name covers what was "Dataproc on Compute Engine" (clusters) and "Google Cloud Serverless for Apache Spark". The serverless form "lets you run Spark workloads without requiring you to provision and manage your own cluster". It suits teams that already have Spark code.</p>
+        <p><strong>Cloud Run functions (formerly Cloud Functions).</strong> Small pieces of code that "can respond to asynchronous events, such as a message on a Pub/Sub topic, a change in a Cloud Storage bucket". One file lands, one function call validates it. It bills requests and compute time.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Why "serverless" does not mean "no bill to watch"<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>None of the four routes has a machine for your team to patch, but each one has a meter that grows with use, and the meters do not look alike. Scheduled SQL grows with the bytes it reads, so a nightly rebuild that reads a whole history table every night costs more every month the history grows. Dataflow grows with worker time per job. Spark clusters, unless serverless, can run while nobody uses them. Functions grow with the number of calls, which follows the number of files or events.</p>
+        <p>So the owner of a route is also the owner of its meter. Prices for each are on the product's own pricing page; these pages quote only the BigQuery ones, in session 5, because they are the ones the builder bench verifies.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The Spark cluster that ran one SQL statement a day.</strong> A team migrating from an on-premises Hadoop estate moves its nightly jobs onto a managed Spark cluster, because that is what the jobs ran on before. A review a year later finds that most of the jobs read tables already in the warehouse and run one SQL statement each. Rewritten as scheduled SQL, they need no cluster at all, and the team retires a service nobody enjoyed maintaining. The story is a constructed composite of a common pattern.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers events with Pub/Sub</span>
+      <h2>Events arrive at least once</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">Some data is not a file at all. When a shopper joins Tidewater's loyalty programme, the sign-up app publishes a message, and anything interested can receive it. Pub/Sub is Google Cloud's messaging service for that pattern: publishers send messages to a topic, and each subscription delivers them to one consumer. The detail a leader must carry out of the room is the guarantee it makes by default, because it decides how carefully the consumer has to be built.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 392" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A publisher, the constructed loyalty sign-up app, sends messages to a topic called loyalty-signups. The topic fans out to three subscriptions. Pull: the subscriber requests messages, and exactly-once delivery is possible in the same region. Push: Pub/Sub calls your endpoint, no exactly-once. BigQuery subscription: exports to a BigQuery table, no exactly-once. A consumer on the push route may see a message twice. A highlighted band states the default for all subscription types: at-least-once delivery with no ordering guarantees.">
+        <defs>
+          <filter id="a4bSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="127" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <marker id="a4bAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .a4bH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .a4bL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .a4bS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a4bW { font: 800 12px Inter, sans-serif; fill: #FFFFFF; }
+          .a4bN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="a4bH" x="30" y="26">ONE TOPIC, THREE KINDS OF SUBSCRIPTION (LOYALTY SIGN-UPS, CONSTRUCTED)</text>
+
+        <g filter="url(#a4bSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="140" width="150" height="60" rx="10" transform="rotate(-1.2 105 170)" fill="#FFFFFF"/>
+          <path d="M184 170 L236 170" marker-end="url(#a4bAr)"/>
+          <rect x="240" y="130" width="170" height="80" rx="12" transform="rotate(0.8 325 170)" fill="#174EA6" stroke="#174EA6"/>
+          <path d="M414 170 C 440 170, 450 80, 474 80" marker-end="url(#a4bAr)"/>
+          <path d="M414 170 L474 170" marker-end="url(#a4bAr)"/>
+          <path d="M414 170 C 440 170, 450 260, 474 260" marker-end="url(#a4bAr)"/>
+          <rect x="480" y="50" width="210" height="60" rx="10" transform="rotate(-0.8 585 80)" fill="#E8F0FE"/>
+          <rect x="480" y="140" width="210" height="60" rx="10" transform="rotate(0.7 585 170)" fill="#FFFFFF"/>
+          <rect x="480" y="230" width="210" height="60" rx="10" transform="rotate(-0.6 585 260)" fill="#FFFFFF"/>
+          <path d="M694 170 L716 170" marker-end="url(#a4bAr)"/>
+          <rect x="720" y="140" width="130" height="60" rx="10" transform="rotate(1.5 785 170)" fill="#FFFFFF"/>
+          <rect x="30" y="314" width="820" height="40" rx="8" transform="rotate(-0.2 440 334)" fill="#FBBC04"/>
+        </g>
+
+        <text class="a4bL" x="46" y="166">publisher</text>
+        <text class="a4bS" x="46" y="184">loyalty sign-up app</text>
+        <text class="a4bW" x="258" y="164">topic</text>
+        <text class="a4bW" x="258" y="184">loyalty-signups</text>
+
+        <text class="a4bL" x="496" y="76">pull subscription</text>
+        <text class="a4bS" x="496" y="96">exactly-once: same region</text>
+        <text class="a4bL" x="496" y="166">push subscription</text>
+        <text class="a4bS" x="496" y="186">Pub/Sub calls your endpoint</text>
+        <text class="a4bL" x="496" y="256">BigQuery subscription</text>
+        <text class="a4bS" x="496" y="276">exports to a BigQuery table</text>
+
+        <text class="a4bL" x="734" y="166">consumer</text>
+        <text class="a4bS" x="734" y="186">may see one twice</text>
+
+        <text class="a4bL" x="48" y="339">Default on all subscription types: at-least-once delivery, no ordering guarantee</text>
+
+        <text class="a4bN" x="30" y="380">Only pull subscriptions support exactly-once, and only when subscribers connect in the same region.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow line is the one to design for: a message can arrive more than once, and in any order</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Three subscriptions, one default<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Google's subscription overview names three types. "Pull subscriptions use a subscriber client to request messages from the Pub/Sub server." "Push subscriptions use the Pub/Sub server to initiate requests to your subscriber application to deliver messages." "BigQuery subscriptions export data to a BigQuery table." Then the sentence that matters: "By default, Pub/Sub offers at-least-once delivery with no ordering guarantees on all subscription types."</p>
+        <p>"Pub/Sub also supports exactly-once delivery", with two limits from the exactly-once page: only the pull subscription type supports it, and "The exactly-once delivery guarantee only applies when subscribers connect to the service in the same region." Push and BigQuery subscriptions never get it. For Tidewater's loyalty sign-ups, landing straight in a table through a BigQuery subscription, that means the table can hold the same sign-up twice.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Why every event pipeline must be idempotent<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>This conclusion is ours, derived from Google's guarantee: if delivery is at least once, a duplicate is a matter of when, not whether. A consumer is idempotent when processing the same message twice leaves the same result as processing it once. In practice that means each message carries a stable identifier (the sign-up's own id, not the time it arrived), and the consumer writes by that identifier, so a repeat overwrites rather than adds.</p>
+        <p>Ordering is the second half. With "no ordering guarantees", a "member updated" message can arrive before the "member joined" message it updates. Windows, late data and ordering design are a subject of their own, taught in <a href="https://phoebefu6.github.io/learn-streaming-data-with-phoebe/">Learn Streaming Data with Phoebe</a>. The leader's job is to ask, in every design review that involves events: what happens when this message arrives twice, or out of order?</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The welcome bonus paid twice.</strong> A loyalty programme credits a welcome bonus on every sign-up message it receives. During a brief outage the messaging service redelivers a batch of messages, exactly as its at-least-once contract allows, and several hundred members get their bonus twice. Nothing malfunctioned. The consumer was written as if each message would arrive once. The story is a constructed composite; the delivery guarantee is Google's.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-3">
+    <div class="section-kicker">
+      <span class="klabel">Part 3 · covers choosing by workload</span>
+      <h2>Choose by the shape of the work</h2>
+      <span class="tag concept">4 min live</span>
+    </div>
+    <p class="lede">Teams often pick a pipeline tool by who is in the room: the Spark person proposes Spark, the Python person proposes a function. A better habit is to ask four questions in a fixed order and take the first yes. The guide below is constructed by us from the products' documented purposes; it is a starting point for a design review, not a Google rule.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A decision guide with four questions in order, each with a yes branch to the right and a no branch down. One: is the data already in BigQuery and is SQL enough? Yes: scheduled SQL in BigQuery, highlighted. Two: light work per file as each file arrives? Yes: a Cloud Run function. Three: existing Spark code or Spark libraries? Yes: Managed Service for Apache Spark. Four: streaming, or complex batch with windows? Yes: Dataflow running Apache Beam. No to all four suggests two routes and an orchestrator.">
+        <defs>
+          <filter id="a4cSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="131" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <marker id="a4cAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .a4cH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .a4cL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .a4cS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a4cA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .a4cN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="a4cH" x="30" y="26">FOUR QUESTIONS, IN ORDER: THE FIRST YES WINS (CONSTRUCTED GUIDE)</text>
+
+        <g filter="url(#a4cSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="40" y="50" width="380" height="50" rx="10" transform="rotate(-0.6 230 75)" fill="#E8F0FE"/>
+          <rect x="40" y="130" width="380" height="50" rx="10" transform="rotate(0.5 230 155)" fill="#E8F0FE"/>
+          <rect x="40" y="210" width="380" height="50" rx="10" transform="rotate(-0.5 230 235)" fill="#E8F0FE"/>
+          <rect x="40" y="290" width="380" height="50" rx="10" transform="rotate(0.6 230 315)" fill="#E8F0FE"/>
+          <path d="M230 102 L230 126 M230 182 L230 206 M230 262 L230 286" marker-end="url(#a4cAr)"/>
+          <path d="M424 75 L516 75 M424 155 L516 155 M424 235 L516 235 M424 315 L516 315" marker-end="url(#a4cAr)"/>
+          <rect x="520" y="50" width="320" height="50" rx="10" transform="rotate(1 680 75)" fill="#FBBC04"/>
+          <rect x="520" y="130" width="320" height="50" rx="10" transform="rotate(-1 680 155)" fill="#FFFFFF"/>
+          <rect x="520" y="210" width="320" height="50" rx="10" transform="rotate(0.8 680 235)" fill="#FFFFFF"/>
+          <rect x="520" y="290" width="320" height="50" rx="10" transform="rotate(-0.8 680 315)" fill="#FFFFFF"/>
+        </g>
+
+        <text class="a4cL" x="58" y="80">1 · Data already in BigQuery, and SQL is enough?</text>
+        <text class="a4cL" x="58" y="160">2 · Light work per file, as each one arrives?</text>
+        <text class="a4cL" x="58" y="240">3 · Existing Spark code or Spark libraries?</text>
+        <text class="a4cL" x="58" y="320">4 · Streaming, or complex batch with windows?</text>
+        <text class="a4cA" x="240" y="119">no</text>
+        <text class="a4cA" x="240" y="199">no</text>
+        <text class="a4cA" x="240" y="279">no</text>
+        <text class="a4cA" x="456" y="68">yes</text>
+        <text class="a4cA" x="456" y="148">yes</text>
+        <text class="a4cA" x="456" y="228">yes</text>
+        <text class="a4cA" x="456" y="308">yes</text>
+
+        <text class="a4cL" x="538" y="72">Scheduled SQL in BigQuery</text>
+        <text class="a4cL" x="538" y="90">bytes read or slot-hours</text>
+        <text class="a4cL" x="538" y="152">Cloud Run function</text>
+        <text class="a4cS" x="538" y="170">requests and compute seconds</text>
+        <text class="a4cL" x="538" y="232">Managed Service for Apache Spark</text>
+        <text class="a4cS" x="538" y="250">cluster or serverless time</text>
+        <text class="a4cL" x="538" y="312">Dataflow running Apache Beam</text>
+        <text class="a4cS" x="538" y="330">worker vCPU and memory, per second</text>
+
+        <text class="a4cS" x="40" y="364">No to all four: the flow probably needs two routes, and something to run them in order.</text>
+        <text class="a4cN" x="30" y="388">Constructed guide from each product's documented purpose. Ask the questions in this order.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow answer comes first on purpose: if SQL in BigQuery can do it, adding a service is a cost, not a feature</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The limits that decide between a function and a job<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Cloud Run runs code in several shapes: "your code can run as a service, job, worker pool, or instance." Two of them matter for pipelines, and their time limits decide which one fits. A request to a service or function times out "by default to 5 minutes (300 seconds) and can be extended up to 60 minutes (3600 seconds)". A job's tasks run "for a maximum of 10 minutes" by default and can be set up to 168 hours (7 days).</p>
+        <p>The practical reading: a function per file is right when each file can be handled in seconds to minutes. A monthly file that takes two hours to process does not belong in a request; it belongs in a job, or in Dataflow. Builder session 6 writes and runs a function on a laptop and shows where the limits bite.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>When the routes need an orchestrator<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Real flows chain routes: a function validates a file, then a SQL statement rebuilds a curated table, then a feature table refreshes. Something has to run them in order and retry the failures. Google Cloud's managed Airflow service is Cloud Composer, which "is evolving to become Managed Service for Apache Airflow"; these pages name it and stop there. How to design orchestration, dependencies, retries and backfills, lives in <a href="https://phoebefu6.github.io/learn-data-orchestration-with-phoebe/">Learn Data Orchestration with Phoebe</a>.</p>
+        <p>One honest gap. Several secondary sources say a scheduled query cannot run more often than every five minutes. We could not read that rule verbatim on Google's scheduling page, so treat it as reported, and confirm it in the console before you design around it.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The function that ran out of time once a month.</strong> A file-validation function works perfectly every night, until month end, when the finance export is many times larger and the call hits its request timeout. The fix is not a bigger function. The month-end file moves to a job with a longer task limit, and the nightly files stay where they were. The story is constructed; the timeouts are Google's.</p>
+    </div>
+  </section>
+
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>Route Tidewater's five flows</h2>
+      <span class="tag demo">★ 22 min · everyone builds</span>
+    </div>
+    <p class="lede">Paper only. Tidewater, constructed for these pages, has five data flows: point-of-sale sales files every night, loyalty sign-ups as events, supplier price CSVs every week, a churn feature table, and a daily KPI table for the store managers. For each one, write how it arrives, which route it takes, which meter it runs on, and who owns that meter. Use the four questions from Part 3 in order.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A hand-drawn worksheet with five columns: flow, arrives as, route, meter, owner. Five rows for the constructed Tidewater. The first row is worked: point-of-sale sales files, nightly files, a Cloud Run function per file, requests and seconds, data-eng. The other four rows, loyalty sign-ups as events, supplier price CSVs weekly, churn features and the daily KPI table, have empty route, meter and owner cells. A yellow tab asks which flow must survive a duplicate.">
+        <defs>
+          <filter id="a4dSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="137" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+        </defs>
+        <style>
+          .a4dH { font: 800 11px Inter, sans-serif; fill: #202124; letter-spacing: .04em; }
+          .a4dL { font: 600 11px Inter, sans-serif; fill: #202124; }
+          .a4dS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .a4dN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#a4dSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="24" width="820" height="232" rx="8" transform="rotate(-0.3 440 140)" fill="#FFFFFF"/>
+          <path d="M30 56 L850 56"/>
+          <path d="M200 24 L200 256 M340 24 L340 256 M560 24 L560 256 M720 24 L720 256" stroke="#DADCE0"/>
+          <path d="M40 96 L840 96 M40 136 L840 136 M40 176 L840 176 M40 216 L840 216" stroke="#E8EAED"/>
+          <rect x="36" y="60" width="808" height="32" rx="4" fill="#E8F0FE" stroke="#E8F0FE"/>
+          <rect x="30" y="272" width="300" height="28" rx="6" transform="rotate(0.8 180 286)" fill="#FBBC04"/>
+        </g>
+
+        <text class="a4dH" x="44" y="45">FLOW</text>
+        <text class="a4dH" x="212" y="45">ARRIVES AS</text>
+        <text class="a4dH" x="352" y="45">ROUTE</text>
+        <text class="a4dH" x="572" y="45">METER</text>
+        <text class="a4dH" x="732" y="45">OWNER</text>
+        <text class="a4dL" x="44" y="81">POS sales files</text>
+        <text class="a4dS" x="212" y="81">nightly files</text>
+        <text class="a4dL" x="352" y="81">Cloud Run function per file</text>
+        <text class="a4dS" x="572" y="81">requests, seconds</text>
+        <text class="a4dS" x="732" y="81">data-eng (raj)</text>
+        <text class="a4dL" x="44" y="121">loyalty sign-ups</text>
+        <text class="a4dS" x="212" y="121">events</text>
+        <text class="a4dS" x="352" y="121">?</text>
+        <text class="a4dL" x="44" y="161">supplier price CSVs</text>
+        <text class="a4dS" x="212" y="161">weekly files</text>
+        <text class="a4dS" x="352" y="161">?</text>
+        <text class="a4dL" x="44" y="201">churn features</text>
+        <text class="a4dS" x="212" y="201">from tables</text>
+        <text class="a4dS" x="352" y="201">?</text>
+        <text class="a4dL" x="44" y="241">daily KPI table</text>
+        <text class="a4dS" x="212" y="241">from tables</text>
+        <text class="a4dS" x="352" y="241">?</text>
+        <text class="a4dL" x="44" y="291">Which flow must survive a duplicate?</text>
+
+        <text class="a4dN" x="348" y="291">Flows constructed for Tidewater. The tinted row is worked.</text>
+        <text class="a4dN" x="30" y="326">One row per flow. Every route needs a meter, and every meter needs a name next to it.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - five flows, one worked; the owner column is the one most sheets leave blank</figcaption>
+    </figure>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>Write how each flow arrives.</strong> Files on a schedule, events one at a time, or data already sitting in BigQuery tables. This one column answers most of the routing.</p>
+      </div>
+      <div class="step">
+        <p><strong>Work the first row together.</strong> The point-of-sale files land nightly, one per store. Each needs a light check before it is trusted.</p>
+        <div class="prompt-box good"><span class="label">★ Worked example: POS sales files</span>Flow:      POS sales files, one per store per night
+Arrives:   files in gs://tw-lake-prod-landing/sales/dt=.../
+Q1:        not yet in BigQuery          -&gt; no
+Q2:        light check per file on arrival -&gt; yes
+Route:     Cloud Run function per file, writes to sales_raw
+Meter:     requests and compute seconds
+Owner:     data-eng (raj)
+Then:      scheduled SQL builds sales_curated from sales_raw
+           (second route, second meter: bytes read)</div>
+      </div>
+      <div class="step">
+        <p><strong>Route the other four with the four questions.</strong> Ask them in order and stop at the first yes. Write the meter beside each route, and mark any flow that arrives as events with "must be idempotent".</p>
+        <div class="prompt-box good"><span class="label">★ One defensible answer: the daily KPI table</span>Flow:      daily KPI table for store managers
+Arrives:   computed from sales_curated, already in BigQuery
+Q1:        data in BigQuery, SQL is enough -&gt; yes
+Route:     scheduled SQL
+Meter:     bytes read (name the columns; session 5 prices it)
+Owner:     analytics lead</div>
+      </div>
+      <div class="step">
+        <p><strong>Name an owner for every meter.</strong> One person per row who answers when that route's cost jumps or its data is late. If one person owns all five, write it down: that is a staffing finding.</p>
+      </div>
+      <div class="step">
+        <p><strong>Repeat for three of your own flows.</strong> Circle any route chosen because "that is what we already know" rather than by the four questions. Those are the ones to revisit first.</p>
+      </div>
+    </div>
+
+    <div class="prompt-box bad"><span class="label">✗ The routing sheet that grows a service per flow</span>a Spark cluster for the nightly SQL, because the jobs ran on Spark before
+a streaming pipeline for a weekly CSV
+an event consumer that adds a row for every message it receives</div>
+
+    <div class="callout tip">
+      <p><strong>Ask "is it already in BigQuery?" first.</strong> If the answer is yes and the transformation is SQL, every other route adds a service, a meter and an owner for no gain. The first question in the guide is first on purpose.</p>
+    </div>
+  </section>
+
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 5</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li><strong>List your pipelines.</strong> Ask your data team for every scheduled or event-driven flow that writes to BigQuery, and which service runs it.</li>
+      <li><strong>Find one that could be SQL.</strong> Look for a job on Spark or Dataflow whose input is already in BigQuery and whose work is a single query.</li>
+      <li><strong>Ask the duplicate question.</strong> For one event-fed flow, ask what happens when the same message arrives twice. Write down the answer, including "we do not know".</li>
+      <li><strong>Find the biggest scheduled query.</strong> Note how often it runs and how many columns it reads. Session 5 turns exactly that into a monthly bill.</li>
+    </ol>
+  </section>
+
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+    <p>Clear all three and leader session 4 gets stamped in your passport.</p>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">1 · What does Pub/Sub guarantee by default, on all subscription types?</p>
+      <button class="qopt" type="button">A · Exactly-once delivery, in publish order</button>
+      <button class="qopt" type="button">B · At-least-once delivery with no ordering guarantees</button>
+      <button class="qopt" type="button">C · At-most-once delivery, so messages can be lost but never repeated</button>
+      <button class="qopt" type="button">D · Exactly-once on push subscriptions only</button>
+      <p class="qwhy">"By default, Pub/Sub offers at-least-once delivery with no ordering guarantees on all subscription types." Exactly-once exists, but only on pull subscriptions in the same region, so consumers should expect duplicates.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">2 · Tidewater's daily KPI table is computed from sales_curated, which is already in BigQuery, and the logic is one SQL statement. Which route fits best?</p>
+      <button class="qopt" type="button">A · Scheduled SQL inside BigQuery: no new service, and it bills on the meter already being watched</button>
+      <button class="qopt" type="button">B · A Managed Service for Apache Spark cluster, to be safe on scale</button>
+      <button class="qopt" type="button">C · A Dataflow streaming pipeline</button>
+      <button class="qopt" type="button">D · A Cloud Run function that reads every row</button>
+      <p class="qwhy">The first question in the guide is "data already in BigQuery, and SQL is enough?". Scheduled queries "use features of BigQuery Data Transfer Service" and bill bytes read or slot-hours like any query.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">3 · What does Dataflow execute?</p>
+      <button class="qopt" type="button">A · Spark jobs written for Dataproc</button>
+      <button class="qopt" type="button">B · Scheduled SQL statements</button>
+      <button class="qopt" type="button">C · Apache Beam pipelines, for stream and batch processing</button>
+      <button class="qopt" type="button">D · Airflow DAGs</button>
+      <p class="qwhy">"Dataflow executes Apache Beam pipelines", and it "provides unified stream and batch data processing at scale". Builder session 5 runs a Beam pipeline on a laptop.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What this session teaches, and where it came from</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Dataflow: purpose, Beam, billing units, per-second billing per job</span><span class="note">Dataflow overview and Dataflow pricing page, read at source on 3 November 2026</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Managed Service for Apache Spark (formerly Dataproc), clusters and serverless</span><span class="note">Managed Spark clusters and serverless overviews, read at source; rename date not on the page</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Pub/Sub subscription types, at-least-once default, exactly-once limits</span><span class="note">Pub/Sub subscription overview and exactly-once delivery pages, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Scheduled queries use BigQuery Data Transfer Service</span><span class="note">Scheduling queries page, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Cloud Run shapes, request and task timeouts; Cloud Run functions rename</span><span class="note">What is Cloud Run; request timeout; task timeout pages; Cloud Run functions blog (22 August 2024)</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Composer named only</span><span class="note">Managed Airflow overview: "evolving to become Managed Service for Apache Airflow"</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Five-minute minimum for scheduled queries</span><span class="note">Reported only; not read verbatim on Google's page</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Idempotency, the decision guide, Tidewater's flows and the four stories</span><span class="note">Constructed or derived: idempotency follows from at-least-once delivery; the guide is ours</span></div>
+    </div>
+    <p class="mono" style="margin-top:14px">Every fact on this page, and its verification tier, is recorded in the course's source map.</p>
+  </section>
+
+  <section class="cheat" id="cheatsheet">
+    <h3>Leader session 4 cheat sheet <span>· pin this</span></h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>Scheduled SQL</b><span>Data in BigQuery, SQL enough. Bills bytes read or slot-hours. Try it first.</span></div>
+      <div class="cheat-item"><b>Cloud Run functions</b><span>Light work per file or event. Requests and seconds. Request timeout 5 min, up to 60.</span></div>
+      <div class="cheat-item"><b>Managed Spark</b><span>Formerly Dataproc. Existing Spark code. Clusters or serverless.</span></div>
+      <div class="cheat-item"><b>Dataflow</b><span>Runs Apache Beam, stream and batch. Worker time, billed per second per job.</span></div>
+      <div class="cheat-item"><b>Pub/Sub</b><span>At-least-once, no ordering, by default. Exactly-once: pull only, same region.</span></div>
+      <div class="cheat-item"><b>The review question</b><span>What happens when this message arrives twice, or out of order?</span></div>
+    </div>
+  </section>
+
+  <div class="callout next">
+    <span class="nx-pill">Next session</span>
+    <p>Every route tonight ended on a meter, and the biggest one for most data teams is BigQuery's. Session 5 opens it: what on-demand actually counts, the 10 MB minimum, how partitions and clusters cut the bytes, and when a slot reservation beats paying per query, all on the same public taxi table.</p>
+  </div>
+
+  <footer class="pagefoot">
+    <span>Leader session 4 of 6 · learn-gcp-with-phoebe · by Phoebe Fu &nbsp;·&nbsp; 📚 <a href="https://phoebefu6.github.io/learn-with-phoebe/">Learn with Phoebe ↗</a></span>
+    <span><a href="a3-who-gets-in-at-which-level.html">← Prev: Who gets in, at which level</a> &nbsp;·&nbsp; <a href="a5-the-bytes-behind-the-bill.html">Next: The bytes behind the bill →</a></span>
+  </footer>
+
+</main>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

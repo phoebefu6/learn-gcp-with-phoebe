@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Builder session 4 of 8. Grant a role on one dataset, give a pipeline service account a conditioned grant, fence production writes with a deny policy, and run an evaluator that applies Google's documented order to five Tidewater requests.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="IAM as GCP evaluates it - learn gcp with phoebe">
+<meta property="og:description" content="Builder session 4 of 8. Deny before allow, allow unioned down the hierarchy, and five requests traced step by step.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/courses/b4-iam-as-gcp-evaluates-it.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="IAM as GCP evaluates it - learn gcp with phoebe">
+<meta name="twitter:description" content="Builder session 4 of 8. A dataset grant, a conditioned service account, a deny policy, five traced verdicts.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-gcp-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Builder session 4 · IAM as GCP evaluates it - learn gcp with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=2">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-gcp-with-phoebe</a> / Builder session 4 of 8</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn GCP with Phoebe · Builder track · Session 4 of 8</div>
+    <h1>IAM as GCP <span class="accent">evaluates it</span></h1>
+    <p class="sub">Leader session 3 explained who gets in at which level. Tonight you write the policies a data team actually needs, and then you watch them being evaluated in the order Google documents: deny policies first, then the union of allow policies down the hierarchy, then "not granted". Three grants for Tidewater Grocers: analysts on one dataset, a pipeline service account fenced by a condition, and a deny rule that keeps everyone else from writing to production. A small Python evaluator traces five real requests.</p>
+    <div class="chip-row">
+      <span class="chip level">🟡 Core</span>
+      <span class="chip audience">Data engineers, platform engineers, analytics engineers</span>
+      <span class="chip audience">Python on a laptop, no account</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:4">3-18 · A dataset grant, a condition, a deny</span>
+      <span class="a3" style="flex:5">18-40 · Build-along: five requests, traced</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where we start</h2>
+    </div>
+    <p class="lede">Every request to Google Cloud is a question: may this principal use this permission on this resource? Google answers it in a documented order. "IAM always checks relevant deny policies before checking relevant allow policies." Then "The effective allow policy for a resource is the union of the allow policy set at that resource and the allow policy inherited from its parent." Anything that is neither denied nor allowed is not granted. Tonight's company is Tidewater Grocers, a constructed APAC grocery chain: organization <code>tidewater.example</code>, folders <code>data-platform</code>, <code>analytics</code> and <code>sandbox</code>, and the production project <code>tw-lake-prod</code> with datasets <code>sales_raw</code>, <code>sales_curated</code> and <code>loyalty_pii</code>.</p>
+
+    <div class="legend">
+      <span class="pill">🎫 Clear all three quiz questions to stamp your passport</span>
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">★ Build-along = you make the artifact</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> Three policies you could adapt for your own platform, and the habit of reading any access question as three steps. Plus an evaluator on your laptop that prints the verdict and the trace for five Tidewater requests: two allows, two denies and one "not granted", each with the step and the level that decided it.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers a dataset-level grant</span>
+      <h2>Grant the dataset, not the project</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">Analysts at Tidewater need to read curated sales and nothing else. The precise grant is the predefined role BigQuery Data Viewer, <code>roles/bigquery.dataViewer</code>, on the dataset <code>sales_curated</code>, given to the group <code>analysts@tidewater.example</code>. Predefined roles are "managed by Google Cloud services", and this one holds 27 permissions in the roles reference read on 3 November 2026: BigQuery reads such as <code>bigquery.tables.getData</code>, a few Knowledge Catalog (formerly Dataplex) scan reads, and two project reads. Not one of them starts with <code>storage.</code>.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The analysts group, with mei as a member, holds BigQuery Data Viewer, 27 permissions and none of them storage, bound on the dataset sales_curated inside project tw-lake-prod. The grant reaches the orders table in sales_curated. It reaches nothing in sales_raw, nothing in loyalty_pii, and nothing in the landing bucket tw-lake-prod-landing, because a BigQuery role holds no storage permission.">
+        <defs>
+          <filter id="b4aSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="59" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <marker id="b4aAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b4aH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b4aL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b4aS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b4aA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b4aN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="b4aH" x="30" y="26">ONE ROLE, ONE DATASET: WHAT THE ANALYSTS' GRANT REACHES</text>
+
+        <g filter="url(#b4aSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="120" width="200" height="70" rx="8" transform="rotate(-1.5 130 155)" fill="#FFFFFF"/>
+          <rect x="270" y="44" width="580" height="250" rx="12" transform="rotate(0.3 560 169)" fill="#E8F0FE"/>
+          <rect x="286" y="84" width="170" height="110" rx="8" transform="rotate(-0.8 371 139)" fill="#FFFFFF"/>
+          <rect x="300" y="134" width="142" height="44" rx="6" fill="#E8F0FE"/>
+          <rect x="472" y="84" width="170" height="110" rx="8" transform="rotate(0.8 557 139)" fill="#FBBC04"/>
+          <rect x="486" y="134" width="142" height="44" rx="6" fill="#FFFFFF"/>
+          <rect x="658" y="84" width="176" height="110" rx="8" transform="rotate(-0.6 746 139)" fill="#FFFFFF"/>
+          <rect x="672" y="134" width="148" height="44" rx="6" fill="#E8F0FE"/>
+          <rect x="286" y="226" width="548" height="50" rx="8" transform="rotate(0.3 560 251)" fill="#FFFFFF"/>
+          <path d="M234 140 C 300 30, 420 30, 520 80" marker-end="url(#b4aAr)"/>
+        </g>
+
+        <text class="b4aL" x="44" y="150">group: analysts</text>
+        <text class="b4aS" x="44" y="170">mei is a member</text>
+        <text class="b4aA" x="30" y="224">roles/bigquery.dataViewer</text>
+        <text class="b4aS" x="30" y="242">27 permissions, no storage.*</text>
+        <text class="b4aL" x="660" y="68">project tw-lake-prod</text>
+
+        <text class="b4aL" x="300" y="108">sales_raw</text>
+        <text class="b4aS" x="314" y="161">orders</text>
+        <text class="b4aL" x="486" y="108">sales_curated</text>
+        <text class="b4aL" x="500" y="161">orders: readable</text>
+        <text class="b4aL" x="672" y="108">loyalty_pii</text>
+        <text class="b4aS" x="686" y="161">members</text>
+        <text class="b4aS" x="300" y="212">no grant: nothing</text>
+        <text class="b4aA" x="486" y="212">every table in it</text>
+        <text class="b4aS" x="672" y="212">no grant: nothing</text>
+        <text class="b4aL" x="300" y="256">bucket tw-lake-prod-landing</text>
+        <text class="b4aS" x="520" y="256">a BigQuery role holds no storage.* permission</text>
+
+        <text class="b4aN" x="30" y="318">Tidewater's names are constructed; the 27 permissions are from Google's BigQuery roles reference, read 3 November 2026.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow dataset is the whole reach of the grant: its tables, and nothing beside or above it</figcaption>
+    </figure>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>Write the binding, then read the policy back<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A binding is one role given to one or more members on one resource. On a dataset it can be added from the console's Share menu or with the <code>bq</code> tool. Reading a policy back is the other half of the job: <code>gcloud projects get-iam-policy</code> prints the project's allow policy as a list of bindings, each a role, its members and an optional condition. The shape below is constructed for Tidewater, and Google's exact output can carry more fields, so treat it as a reading guide rather than a template.</p>
+        <div class="prompt-box good"><span class="label">★ Shown, needs a real project · grant on one dataset (check the syntax in bq help on your version)</span>bq add-iam-policy-binding \
+  --member="group:analysts@tidewater.example" \
+  --role="roles/bigquery.dataViewer" \
+  tw-lake-prod:sales_curated</div>
+        <div class="prompt-box good"><span class="label">★ Shown, constructed output shape · gcloud projects get-iam-policy tw-lake-prod --format=json</span>{
+  "bindings": [
+    {
+      "role": "roles/bigquery.dataEditor",
+      "members": ["serviceAccount:ingest-pipeline@tw-lake-prod.iam.gserviceaccount.com"],
+      "condition": {
+        "title": "sales_raw only",
+        "expression": "resource.name.startsWith('projects/tw-lake-prod/datasets/sales_raw')"
+      }
+    },
+    {
+      "role": "roles/bigquery.jobUser",
+      "members": ["serviceAccount:ingest-pipeline@tw-lake-prod.iam.gserviceaccount.com"]
+    }
+  ]
+}</div>
+        <p>Notice what the project policy does not show: the analysts' dataset grant lives on the dataset, and the data-engineering grant lives on the folder. To answer "who can read this table?" you read every level from the table up to the organization and take the union. That is exactly what the evaluator in the build-along does.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Why not a basic role<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Basic roles "include thousands of permissions across all Google Cloud services. In production environments, do not grant basic roles unless there is no alternative." The bench in session 8 shows the size of the mistake on a modelled role list: one <code>roles/editor</code> grant on <code>tw-lake-prod</code> takes mei from 27 permissions on <code>sales_curated.orders</code> to 320 of the 334 modelled. There is a second cost too: "you can't add conditions to role bindings for legacy basic roles", so a basic role can never be narrowed the way Part 2 narrows the pipeline.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The analyst who could read the landing bucket.</strong> A team grants its analysts Viewer on the whole project "so they can see BigQuery". Viewer is a basic role across every service, so the same grant opens the raw files in Cloud Storage, including columns the curated tables had dropped. The fix is the grant above: one predefined BigQuery role on one dataset. The story is a constructed composite.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers a service account for the pipeline, with a condition</span>
+      <h2>A pipeline identity with a fence of its own</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">The ingest pipeline is not a person, so it runs as a service account, "a special kind of account typically used by an application or compute workload", "identified by its email address": <code>ingest-pipeline@tw-lake-prod.iam.gserviceaccount.com</code>. It needs to write <code>sales_raw</code> and nothing else. Tidewater gives it BigQuery Data Editor on the project, narrowed by an IAM Condition written in CEL, plus BigQuery Job User so it can run load jobs. A conditional binding grants only while its expression is true.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 270" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The ingest-pipeline service account holds one binding at project tw-lake-prod: BigQuery Data Editor with the condition resource.name.startsWith projects/tw-lake-prod/datasets/sales_raw, plus BigQuery Job User with no condition. The condition is true for sales_raw.orders, so case c08, a write there, is allowed. It is false for sales_curated.orders, so case c09, a write there, is not granted.">
+        <defs>
+          <filter id="b4bSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="61" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <marker id="b4bAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b4bL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b4bS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b4bA { font: 700 11px Inter, sans-serif; fill: #174EA6; }
+          .b4bN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#b4bSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="100" width="200" height="70" rx="8" transform="rotate(1.5 130 135)" fill="#FFFFFF"/>
+          <rect x="270" y="40" width="330" height="170" rx="10" transform="rotate(-0.6 435 125)" fill="#FBBC04"/>
+          <rect x="650" y="50" width="200" height="70" rx="8" transform="rotate(-1 750 85)" fill="#E8F0FE"/>
+          <rect x="650" y="150" width="200" height="70" rx="8" transform="rotate(1 750 185)" fill="#FFFFFF"/>
+          <path d="M234 135 L262 135" marker-end="url(#b4bAr)"/>
+          <path d="M604 100 L642 86" marker-end="url(#b4bAr)"/>
+          <path d="M604 170 L642 184" marker-end="url(#b4bAr)" stroke-dasharray="6 5"/>
+        </g>
+
+        <text class="b4bL" x="44" y="130">ingest-pipeline</text>
+        <text class="b4bS" x="44" y="150">service account, tw-lake-prod</text>
+        <text class="b4bL" x="284" y="66">binding at project tw-lake-prod</text>
+        <text class="b4bL" x="284" y="90">roles/bigquery.dataEditor</text>
+        <text class="b4bL" x="284" y="114">condition:</text>
+        <text class="b4bL" x="284" y="134">resource.name.startsWith(</text>
+        <text class="b4bL" x="284" y="152">'projects/tw-lake-prod/datasets/sales_raw')</text>
+        <text class="b4bL" x="284" y="186">+ roles/bigquery.jobUser, no condition</text>
+        <text class="b4bL" x="664" y="80">sales_raw.orders</text>
+        <text class="b4bA" x="664" y="100">c08 write: allow</text>
+        <text class="b4bL" x="664" y="180">sales_curated.orders</text>
+        <text class="b4bS" x="664" y="200">c09 write: not granted</text>
+
+        <text class="b4bN" x="30" y="250">The condition is checked against each request's resource name: true for sales_raw, false for sales_curated.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow card is the whole design: one broad role, cut down to one dataset by a single string test</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Why a condition beats a second project<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The alternative is to move <code>sales_raw</code> into its own project so a plain project grant is narrow enough. That doubles the billing links, the deny policies and the places to look. A condition keeps one project and narrows one binding: <code>resource.name.startsWith('projects/tw-lake-prod/datasets/sales_raw')</code> is Google's documented attribute pattern, the same one the conditions page shows for buckets. Two limits from that page: "Only some resource types accept conditions in role bindings", so confirm yours does, and you cannot add conditions to legacy basic roles.</p>
+        <p>The trap is in the string. <code>startsWith</code> is a plain prefix test, so the expression above would also match a future dataset called <code>sales_raw_archive</code>. That reading is ours, derived from how a prefix test works, not a sentence on Google's page. Ending the prefix with a slash, <code>.../datasets/sales_raw/</code>, closes the gap for the tables inside, but then the dataset resource itself no longer matches, so decide which you need and test both.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Keys are the risk, not the account<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Google's service account page is direct: "Service account keys are a security risk if not managed correctly", and "You should choose a more secure alternative to service account keys whenever possible." In practice that means letting the workload run as its service account through the platform it runs on, rather than downloading a key file. An organization can enforce that with the Organization Policy constraint <code>iam.disableServiceAccountKeyCreation</code>. Organization Policy "focuses on what" can be configured; IAM "focuses on who".</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The ingestion account that could rewrite the reports.</strong> A pipeline is given Data Editor on the whole project to get it working before a deadline, and the narrowing is left for later. Months on, a bug in a backfill job overwrites a curated table the finance dashboard reads. A one-line condition would have turned the write into "not granted". The story is a constructed composite.</p>
+    </div>
+  </section>
+
+  <section class="section" id="part-3">
+    <div class="section-kicker">
+      <span class="klabel">Part 3 · covers a deny policy</span>
+      <h2>A deny rule that grants are not allowed to lower</h2>
+      <span class="tag concept">5 min live</span>
+    </div>
+    <p class="lede">Allow policies only add. Because the effective policy is a union, a grant higher up cannot be taken back by a narrower policy lower down; that conclusion is derived from Google's "union" wording, not a sentence of Google's. Deny policies are the tool that subtracts. Each one "is attached to an organization, folder, or project" and inherited downward, and IAM checks it first. Its rule has denied principals, exception principals, denied permissions, exception permissions and a denial condition, and denial conditions "only recognize resource tag functions".</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="raj from data-eng asks for bigquery.tables.updateData on sales_raw.orders. Step 1, the deny rule only-the-pipeline-writes-prod at project tw-lake-prod: denied principals is everyone, raj is in it; the only exception is the ingest-pipeline service account, raj is not; the permission tables.updateData matches; the condition, the env tag equals prod, is true. Every check holds, so the verdict is deny, case c06, and evaluation stops. Step 2, the folder data-platform grant of Data Editor to data-eng, is never reached.">
+        <defs>
+          <filter id="b4cSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="67" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+          <marker id="b4cAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#202124" stroke-width="1.6" stroke-linecap="round"/></marker>
+        </defs>
+        <style>
+          .b4cL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b4cS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b4cW { font: 800 12px Inter, sans-serif; fill: #FFFFFF; }
+          .b4cN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <g filter="url(#b4cSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="110" width="170" height="80" rx="8" transform="rotate(-1.5 115 150)" fill="#FFFFFF"/>
+          <rect x="240" y="50" width="330" height="190" rx="10" transform="rotate(0.4 405 145)" fill="#FBBC04"/>
+          <rect x="610" y="60" width="240" height="60" rx="8" transform="rotate(-1 730 90)" fill="#174EA6" stroke="#174EA6"/>
+          <rect x="610" y="160" width="240" height="80" rx="8" transform="rotate(1 730 200)" fill="#FFFFFF" stroke-dasharray="6 5"/>
+          <path d="M204 150 L232 150" marker-end="url(#b4cAr)"/>
+          <path d="M574 100 L602 92" marker-end="url(#b4cAr)"/>
+          <path d="M574 200 L602 204" stroke-dasharray="6 5"/>
+        </g>
+
+        <text class="b4cL" x="44" y="138">raj (data-eng)</text>
+        <text class="b4cS" x="44" y="158">tables.updateData</text>
+        <text class="b4cS" x="44" y="176">on sales_raw.orders</text>
+        <text class="b4cL" x="254" y="74">1 · deny rule at project tw-lake-prod</text>
+        <text class="b4cL" x="254" y="100">denied: everyone; raj is in it</text>
+        <text class="b4cL" x="254" y="124">exception: ingest-pipeline; raj is not</text>
+        <text class="b4cL" x="254" y="148">permission: tables.updateData, matches</text>
+        <text class="b4cL" x="254" y="172">condition: env tag is prod, true</text>
+        <text class="b4cL" x="254" y="208">every check holds: deny, stop here</text>
+        <text class="b4cW" x="624" y="86">DENY (case c06)</text>
+        <text class="b4cW" x="624" y="106">step 1 ends it</text>
+        <text class="b4cL" x="624" y="186">2 · allow union, never reached</text>
+        <text class="b4cS" x="624" y="206">folder data-platform grants</text>
+        <text class="b4cS" x="624" y="224">Data Editor to data-eng</text>
+
+        <text class="b4cN" x="30" y="274">The env tag sits on the project and is inherited by the table. Tag-based deny on BigQuery resources is Preview,</text>
+        <text class="b4cN" x="30" y="292">per BigQuery's tags page; principals, rule and tag values here are constructed for Tidewater.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the yellow step decides before the allow policies are even read, so raj's folder grant never gets a say</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The rule, written out<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Below is Tidewater's rule in the same shape the evaluator reads, constructed to match its fixture. Denied permissions use Google's format <code>SERVICE_FQDN/RESOURCE.ACTION</code>; the deny page's own example is <code>iam.googleapis.com/roles.delete</code>, so check that each permission you deny appears on the page of permissions supported in deny policies before relying on it. Google caps a resource at 500 deny policies holding 500 deny rules in total. Before applying a real policy, check the principal identifier format the deny policies page asks for.</p>
+        <div class="prompt-box good"><span class="label">★ Constructed, matches the evaluator's fixture · deny.json</span>{
+  "displayName": "only-the-pipeline-writes-prod",
+  "rules": [{
+    "denyRule": {
+      "deniedPrincipals": ["principalSet://goog/public:all"],
+      "exceptionPrincipals": [
+        "serviceAccount:ingest-pipeline@tw-lake-prod.iam.gserviceaccount.com"
+      ],
+      "deniedPermissions": ["bigquery.googleapis.com/tables.updateData"],
+      "denialCondition": {
+        "title": "prod only",
+        "expression": "resource.matchTag('1001/env', 'prod')"
+      }
+    }
+  }]
+}</div>
+        <div class="prompt-box good"><span class="label">★ Shown, needs a real project · attach it (check flags on your gcloud version)</span>gcloud iam policies create only-the-pipeline-writes-prod \
+  --attachment-point=cloudresourcemanager.googleapis.com/projects/tw-lake-prod \
+  --kind=denypolicies \
+  --policy-file=deny.json</div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Exceptions skip a deny; they grant nothing<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Exception principals are "exempt from the deny rule". That is all. The pipeline passes the deny because it is the exception, then still needs an allow binding to write, which is why c09, a write to <code>sales_curated</code>, comes back "not granted" with the deny skipped. The bench's case c27 tests the same trap. For column-level fences inside a table, BigQuery uses policy tags; the concepts behind row and column security are taught in <a href="https://phoebefu6.github.io/learn-data-access-control-with-phoebe/">data access control</a>.</p>
+      </div>
+    </details>
+
+    <div class="callout example">
+      <span class="ex-pill">Real world</span>
+      <p><strong>The data engineer who fixed production by hand.</strong> During an incident an engineer with folder-wide Data Editor patches rows in a production table directly, the patch is wrong, and the pipeline's next run cannot reconcile it. A deny on production writes, with the pipeline as the only exception, turns that well-meant patch into a refused request and a conversation. The story is a constructed composite.</p>
+    </div>
+  </section>
+
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>Five requests, traced</h2>
+      <span class="tag demo">★ 22 min · everyone builds</span>
+    </div>
+    <p class="lede">You run an evaluator that applies Google's documented order to Tidewater's constructed policies: the three you wrote tonight, plus a few more on the organization and folders. It prints each verdict, the step that decided it, the level where that happened, and a trace of the rules it read on the way. Predict each verdict before you run it.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 196" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Five Tidewater requests and their verdicts. c05, raj reads sales_raw.orders: allow, from the folder grant. c06, raj writes sales_raw.orders: deny, from the project deny rule. c08, the service account writes sales_raw.orders: allow, as the deny's exception with its condition true. c09, the service account writes sales_curated.orders: not granted, its condition false. c12, lin reads loyalty_pii.members: deny, from the organization's PII fence.">
+        <defs>
+          <filter id="b4dSk" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="71" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+        </defs>
+        <style>
+          .b4dH { font: 800 12px Inter, sans-serif; fill: #202124; }
+          .b4dL { font: 600 12px Inter, sans-serif; fill: #202124; }
+          .b4dS { font: 400 11px Inter, sans-serif; fill: #5F6368; }
+          .b4dV { font: 800 16px Inter, sans-serif; fill: #174EA6; }
+          .b4dW { font: 800 12px Inter, sans-serif; fill: #FFFFFF; }
+          .b4dN { font: 400 12px Inter, sans-serif; fill: #5F6368; }
+        </style>
+
+        <text class="b4dH" x="30" y="26">FIVE REQUESTS, THE VERDICT, AND WHAT DECIDED IT</text>
+
+        <g filter="url(#b4dSk)" fill="none" stroke="#202124" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="30" y="44" width="156" height="110" rx="8" transform="rotate(-1 108 99)" fill="#E8F0FE"/>
+          <rect x="196" y="44" width="156" height="110" rx="8" transform="rotate(1 274 99)" fill="#174EA6" stroke="#174EA6"/>
+          <rect x="362" y="44" width="156" height="110" rx="8" transform="rotate(-0.8 440 99)" fill="#E8F0FE"/>
+          <rect x="528" y="44" width="156" height="110" rx="8" transform="rotate(0.8 606 99)" fill="#FFFFFF"/>
+          <rect x="694" y="44" width="156" height="110" rx="8" transform="rotate(-1 772 99)" fill="#174EA6" stroke="#174EA6"/>
+        </g>
+
+        <text class="b4dL" x="44" y="68">c05 · raj reads</text>
+        <text class="b4dS" x="44" y="86">sales_raw.orders</text>
+        <text class="b4dV" x="44" y="116">allow</text>
+        <text class="b4dS" x="44" y="138">folder grant</text>
+        <text class="b4dW" x="210" y="68">c06 · raj writes</text>
+        <text class="b4dW" x="210" y="86">sales_raw.orders</text>
+        <text class="b4dW" x="210" y="116">deny</text>
+        <text class="b4dW" x="210" y="138">project deny rule</text>
+        <text class="b4dL" x="376" y="68">c08 · SA writes</text>
+        <text class="b4dS" x="376" y="86">sales_raw.orders</text>
+        <text class="b4dV" x="376" y="116">allow</text>
+        <text class="b4dS" x="376" y="138">exception + condition</text>
+        <text class="b4dL" x="542" y="68">c09 · SA writes</text>
+        <text class="b4dS" x="542" y="86">sales_curated.orders</text>
+        <text class="b4dV" x="542" y="116">not granted</text>
+        <text class="b4dS" x="542" y="138">condition false</text>
+        <text class="b4dW" x="708" y="68">c12 · lin reads</text>
+        <text class="b4dW" x="708" y="86">loyalty_pii</text>
+        <text class="b4dW" x="708" y="116">deny</text>
+        <text class="b4dW" x="708" y="138">org PII fence</text>
+
+        <text class="b4dN" x="30" y="180">Deny first, then the union of allow policies, then not granted: the same order the bench applies to 27 cases.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - dark boxes are denies: both decided in step 1, before any grant was read</figcaption>
+    </figure>
+
+    <div class="callout tip">
+      <p><strong>On a billing-enabled project (optional).</strong> Shown, needs a billing-enabled project: the BigQuery sandbox covers BigQuery only, and the $300 Free Trial asks for a card. Everything below runs on your laptop instead; the <code>bq</code> and <code>gcloud</code> boxes above are shown so you recognise them at work.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>Set up.</strong> No extra packages: the evaluator is Python 3.11 standard library only. Use session 1's environment or any Python 3. Put <code>b4_iam.py</code> next to the evaluator files, <code>iam_eval.py</code>, its fixture <code>iam-fixture.json</code> and the roles file <code>roles-2026-11-03.json</code>, or pass their folder as the first argument. <code>iam_eval.py</code> is the Python twin of the evaluator behind builder session 8's bench.</p>
+        <div class="prompt-box good"><span class="label">★ Step 0 · get the evaluator files (same folder as the script)</span>curl -O https://phoebefu6.github.io/learn-gcp-with-phoebe/materials/iam_eval.py
+curl -O https://phoebefu6.github.io/learn-gcp-with-phoebe/materials/iam-fixture.json
+curl -O https://phoebefu6.github.io/learn-gcp-with-phoebe/materials/roles-2026-11-03.json</div>
+        <div class="prompt-box good"><span class="label">★ Step 1 · b4_iam.py, part 1</span># Builder session 4: ask the evaluator what Google's IAM rules say about five Tidewater requests.
+# Same logic as the bench (iam_eval.py, the Python twin of the bench's gcp-iam.js).
+import sys
+sys.path.insert(0, sys.argv[1] if len(sys.argv) &gt; 1 else ".")
+import iam_eval as I</div>
+      </div>
+      <div class="step">
+        <p><strong>Ask five questions.</strong> Each case is a principal, a permission and a resource. The evaluator returns the verdict, the step that decided it (deny, allow or none), the level, and a trace of every rule it read and set aside.</p>
+        <div class="prompt-box good"><span class="label">★ Step 2 · b4_iam.py, part 2</span>for cid in ["c05", "c06", "c08", "c09", "c12"]:
+    c = next(x for x in I.FIX["cases"] if x["id"] == cid)
+    q = c["request"]
+    r = I.evaluate(q)
+    where = r.get("at", "-")
+    print(f"{cid} {q['principal'].split(':')[1]:52s} {q['permission']:28s} on {q['resource']:13s} -&gt; {r['verdict']:11s} ({r['step']} at {where})")
+    for line in r["trace"]:
+        print("     trace:", line)</div>
+      </div>
+      <div class="step">
+        <p><strong>Run it and compare with this real output.</strong> Read c05's trace: the organization's PII fence was checked and set aside because its condition was false for a table without the <code>pii</code> tag. Read c09's: the deny was skipped because the account is the exception, and then the conditional binding failed, so nothing granted it.</p>
+        <div class="prompt-box good"><span class="label">★ Step 3 · python b4_iam.py (real output)</span>c05 raj@tidewater.example                                bigquery.tables.getData      on t-raw-orders  -&gt; allow       (allow at f-data-platform)
+     trace: deny rule at org: denial condition false
+c06 raj@tidewater.example                                bigquery.tables.updateData   on t-raw-orders  -&gt; deny        (deny at tw-lake-prod)
+c08 ingest-pipeline@tw-lake-prod.iam.gserviceaccount.com bigquery.tables.updateData   on t-raw-orders  -&gt; allow       (allow at tw-lake-prod)
+     trace: deny rule at tw-lake-prod: principal is an exception
+c09 ingest-pipeline@tw-lake-prod.iam.gserviceaccount.com bigquery.tables.updateData   on t-cur-orders  -&gt; not-granted (none at -)
+     trace: deny rule at tw-lake-prod: principal is an exception
+     trace: binding roles/bigquery.dataEditor at tw-lake-prod: condition false
+c12 lin@tidewater.example                                bigquery.tables.getData      on t-pii-members -&gt; deny        (deny at org)</div>
+      </div>
+      <div class="step">
+        <p><strong>Break it on the bench.</strong> Open <a href="b8-the-gcp-iam-and-cost-bench.html#bench">the bench in builder session 8</a>. The same logic passes 27 of 27 cases. Press the break button that evaluates allow before deny: it passes 24 and fails c06, c12 and c21. Press the one that ignores inheritance: it passes 13. Then switch on the anti-lever, <code>roles/editor</code> for mei on <code>tw-lake-prod</code>, and watch her permissions on <code>sales_curated.orders</code> go from 27 to 320 of the 334 modelled.</p>
+        <div class="prompt-box good"><span class="label">★ Step 4 · what to write down from the bench</span>correct logic            27 of 27
+allow before deny        24 of 27   (fails c06, c12, c21)
+ignore inheritance       13 of 27
+anti-lever, mei          27 -&gt; 320 of 334 modelled permissions on sales_curated.orders</div>
+      </div>
+    </div>
+
+    <div class="prompt-box bad"><span class="label">✗ Trying to take back a folder grant with a narrower allow policy</span># folder data-platform: data-eng has roles/bigquery.dataEditor
+# project tw-lake-prod:  data-eng given roles/bigquery.dataViewer "to make it read-only"
+# effective policy = union of both, so data-eng can still write; only a deny subtracts</div>
+  </section>
+
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 5</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li><strong>Add a case.</strong> Copy c06 in <code>iam-fixture.json</code>, change the resource to the dev table <code>t-dev-orders</code>, and predict the verdict before you rerun the evaluator. Which rule stops applying, and why?</li>
+      <li><strong>Close the prefix gap.</strong> Rewrite the pipeline's condition so that a future <code>sales_raw_archive</code> dataset would not match. Write down what changes for the dataset resource itself.</li>
+      <li><strong>Draw your own three steps.</strong> For one access question at work, write the deny policies, the allow bindings at each level, and the verdict. Where did you have to guess?</li>
+      <li><strong>Read the bench's c27.</strong> Explain in two sentences why an exception principal is still not granted anything.</li>
+    </ol>
+  </section>
+
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+    <p>Clear all three and builder session 4 gets stamped in your passport.</p>
+
+    <div class="quiz-q" data-answer="3">
+      <p class="qtext">1 · raj has Data Editor on the folder <code>data-platform</code>. Why is his write to <code>sales_raw.orders</code> denied (c06)?</p>
+      <button class="qopt" type="button">A · Folder grants do not reach tables</button>
+      <button class="qopt" type="button">B · The project grant is more specific, so it wins</button>
+      <button class="qopt" type="button">C · Data Editor does not include writing to tables</button>
+      <button class="qopt" type="button">D · IAM checks deny policies first; the project's deny on production writes names everyone except the pipeline, the env tag is prod, so evaluation stops before the folder grant is read</button>
+      <p class="qwhy">"IAM always checks relevant deny policies before checking relevant allow policies." The folder grant is real (c05 shows raj can read), but it never gets a say on the write.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">2 · The pipeline is the deny rule's exception. Why can it still not write <code>sales_curated.orders</code> (c09)?</p>
+      <button class="qopt" type="button">A · Service accounts cannot write to curated datasets</button>
+      <button class="qopt" type="button">B · Its only write grant carries the condition <code>resource.name.startsWith('projects/tw-lake-prod/datasets/sales_raw')</code>, which is false for <code>sales_curated</code>, so nothing allows it and the verdict is not granted</button>
+      <button class="qopt" type="button">C · The deny rule applies to it after all</button>
+      <button class="qopt" type="button">D · Job User blocks writes</button>
+      <p class="qwhy">Skipping the deny is only step 1. Step 2 still needs a binding whose condition is true, and the only one is fenced to <code>sales_raw</code>.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">3 · What does an exception principal in a deny rule do?</p>
+      <button class="qopt" type="button">A · It grants the denied permissions to that principal</button>
+      <button class="qopt" type="button">B · It removes the principal from every allow policy</button>
+      <button class="qopt" type="button">C · It exempts that principal from the deny rule, and grants nothing: an allow binding is still needed</button>
+      <button class="qopt" type="button">D · It makes the deny apply only to that principal</button>
+      <p class="qwhy">Google's wording is "exempt from the deny rule". Exempt is not allowed; c09 and the bench's c27 both show it.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What this session teaches, and where it came from</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Deny before allow, attachment points, rule fields, tag-only denial conditions, the permission format, 500-policy limit</span><span class="note">IAM deny policies overview; permissions supported in deny policies, read at source on 3 November 2026</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Union of inherited allow policies</span><span class="note">Policy inheritance; allow policies, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">IAM Conditions in CEL, startsWith on resource names, no conditions on legacy basic roles</span><span class="note">Overview of IAM Conditions; roles overview, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Data Viewer's 27 permissions; predefined and basic roles</span><span class="note">IAM roles reference for BigQuery, retrieved 3 November 2026; IAM overview</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Service accounts and key risk; Organization Policy who and what</span><span class="note">Service accounts overview; Organization Policy introduction, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">Tags in deny policies are Preview for BigQuery</span><span class="note">BigQuery tags page, read at source</span></div>
+      <div class="covered-row"><span class="status pill solid">✓</span><span class="name">The evaluator output</span><span class="note">Real run of b4_iam.py, Python 3.11 standard library, on the bench's fixture</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">"No way to remove an inherited grant" and the startsWith prefix trap</span><span class="note">Derived from the documented union rule and from how a prefix test works; not Google's sentences</span></div>
+      <div class="covered-row"><span class="status pill light">◐</span><span class="name">Tidewater hierarchy, policies, the get-iam-policy and deny.json shapes, the stories</span><span class="note">Constructed; the bq and gcloud commands are shown, not run</span></div>
+    </div>
+    <p class="mono" style="margin-top:14px">Every fact on this page, and its verification tier, is recorded in the course's source map.</p>
+  </section>
+
+  <section class="cheat" id="cheatsheet">
+    <h3>Builder session 4 cheat sheet <span>· pin this</span></h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>Order</b><span>Deny policies first, then the union of allow policies, then not granted.</span></div>
+      <div class="cheat-item"><b>Grant small</b><span>A predefined role on the dataset: <code>roles/bigquery.dataViewer</code> on <code>sales_curated</code>.</span></div>
+      <div class="cheat-item"><b>Conditions</b><span>CEL on one binding: <code>resource.name.startsWith(...)</code>. Mind the prefix.</span></div>
+      <div class="cheat-item"><b>Deny</b><span>On org, folder or project; inherited down. Conditions read tags only.</span></div>
+      <div class="cheat-item"><b>Exceptions</b><span>Exempt from the deny; still need an allow to do anything.</span></div>
+      <div class="cheat-item"><b>Service accounts</b><span>One per workload, no keys where avoidable; enforce with an Org Policy constraint.</span></div>
+    </div>
+  </section>
+
+  <div class="callout next">
+    <span class="nx-pill">Next session</span>
+    <p>The pipeline now has an identity and a fence. Session 5 is about what it runs: Dataflow and Beam, the idea, with a Beam pipeline on your laptop that groups the taxi trips by year and by 30-day window.</p>
+  </div>
+
+  <footer class="pagefoot">
+    <span>Builder session 4 of 8 · learn-gcp-with-phoebe · by Phoebe Fu &nbsp;·&nbsp; 📚 <a href="https://phoebefu6.github.io/learn-with-phoebe/">Learn with Phoebe ↗</a></span>
+    <span><a href="b3-partitioning-and-clustering.html">← Prev: Partitioning and clustering</a> &nbsp;·&nbsp; <a href="b5-dataflow-and-beam-the-idea.html">Next: Dataflow and Beam, the idea →</a></span>
+  </footer>
+
+</main>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

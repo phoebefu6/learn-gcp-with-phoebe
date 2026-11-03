@@ -1,0 +1,7 @@
+Cash            872    10.71
+Credit Card     871    15.70
+Mobile           23    21.03
+Prcard           15    12.25
+Unknown          10    17.17
+No Charge         7    36.86
+Dispute           2     5.00
